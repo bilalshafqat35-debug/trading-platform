@@ -1,0 +1,224 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>My Portfolio</title>
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+
+  <div class="toast-container" id="toastContainer">
+    {% for m in messages %}
+      <div class="toast {{ m.tags }}">
+        <span class="toast-icon">
+          {% if 'success' in m.tags %}✓{% elif 'error' in m.tags %}✕{% else %}ℹ{% endif %}
+        </span>
+        <span class="toast-text">{{ m }}</span>
+        <button type="button" class="toast-close" onclick="closeToast(this.parentElement)">×</button>
+      </div>
+    {% endfor %}
+  </div>
+
+  <div class="history-wrap">
+
+    <div class="history-header">
+      <h2>My Portfolio</h2>
+      <a href="{% url 'dashboard' %}" class="back-btn">← Back to Dashboard</a>
+    </div>
+
+    <div class="portfolio-summary">
+      <div class="portfolio-summary-card">
+        <div class="label">Total Value</div>
+        <div class="value">${{ total_value|floatformat:2 }}</div>
+      </div>
+      <div class="portfolio-summary-card">
+        <div class="label">Total Invested</div>
+        <div class="value">${{ total_invested|floatformat:2 }}</div>
+      </div>
+      <div class="portfolio-summary-card {% if is_total_profit %}profit{% else %}loss{% endif %}">
+        <div class="label">Total P&amp;L</div>
+        <div class="value">
+          {% if is_total_profit %}+{% else %}-{% endif %}${{ total_pnl|floatformat:2|cut:"-" }}
+        </div>
+        <div class="pct">
+          {% if is_total_profit %}+{% else %}-{% endif %}{{ total_pnl_pct|floatformat:2|cut:"-" }}%
+        </div>
+      </div>
+    </div>
+
+    <div class="portfolio-balance-bar">
+      <span class="label">Available Cash Balance:</span>
+      <span class="value">${{ balance|floatformat:2 }}</span>
+    </div>
+
+    {% if holdings %}
+      <h3 style="margin-top:24px;">Your Holdings ({{ holdings|length }})</h3>
+
+      <div class="holdings-grid">
+        {% for h in holdings %}
+          <div class="holding-card">
+            <div class="holding-header">
+              <div class="holding-symbol">
+                {{ h.label }} <span class="holding-ticker">({{ h.symbol }})</span>
+              </div>
+              <div class="holding-badge {% if h.is_profit %}profit{% else %}loss{% endif %}">
+                {% if h.is_profit %}+{% else %}-{% endif %}{{ h.pnl_pct|floatformat:2|cut:"-" }}%
+              </div>
+            </div>
+
+            <div class="holding-body">
+              <div class="holding-row">
+                <span class="row-label">Quantity</span>
+                <span class="row-value">{{ h.quantity|floatformat:"-8" }} {{ h.symbol }}</span>
+              </div>
+              <div class="holding-row">
+                <span class="row-label">Avg Buy Price</span>
+                <span class="row-value">${{ h.avg_buy|floatformat:2 }}</span>
+              </div>
+              <div class="holding-row">
+                <span class="row-label">Current Price</span>
+                <span class="row-value">${{ h.current_price|floatformat:2 }}</span>
+              </div>
+              <div class="holding-row">
+                <span class="row-label">Invested</span>
+                <span class="row-value">${{ h.invested|floatformat:2 }}</span>
+              </div>
+              <div class="holding-row highlight">
+                <span class="row-label">Current Value</span>
+                <span class="row-value">${{ h.current_value|floatformat:2 }}</span>
+              </div>
+              <div class="holding-row {% if h.is_profit %}profit{% else %}loss{% endif %}">
+                <span class="row-label">P&amp;L</span>
+                <span class="row-value">
+                  {% if h.is_profit %}+{% else %}-{% endif %}${{ h.pnl|floatformat:2|cut:"-" }}
+                </span>
+              </div>
+            </div>
+
+            <div class="holding-actions">
+              <a href="{% url 'dashboard' %}?market={{ h.type }}&symbol={{ h.symbol }}"
+                 class="holding-btn buy-more">Buy More</a>
+              <button type="button"
+                      class="holding-btn close-position"
+                      onclick="openCloseModal('{{ h.symbol }}', '{{ h.quantity|floatformat:"-8" }}', '{{ h.label }}')">
+                Close Position
+              </button>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="portfolio-empty">
+        <div class="empty-icon">🎯</div>
+        <h3>No Holdings Yet</h3>
+        <p>Start trading to build your portfolio. Your positions will appear here.</p>
+        <a href="{% url 'dashboard' %}" class="portfolio-empty-btn">Go to Dashboard</a>
+      </div>
+    {% endif %}
+
+  </div>
+
+  <!-- Close Position Modal -->
+  <div class="modal-overlay" id="closeModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Close Position</h3>
+        <button type="button" class="modal-close" onclick="closeModal()">×</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-info">
+          Closing <strong id="modalLabel">—</strong> — you own <strong id="modalQty">—</strong>.
+        </p>
+
+        <label class="modal-label">How much do you want to close?</label>
+        <div class="percent-buttons">
+          <button type="button" class="percent-btn" data-pct="25"  onclick="setPercent(25, this)">25%</button>
+          <button type="button" class="percent-btn" data-pct="50"  onclick="setPercent(50, this)">50%</button>
+          <button type="button" class="percent-btn" data-pct="75"  onclick="setPercent(75, this)">75%</button>
+          <button type="button" class="percent-btn active" data-pct="100" onclick="setPercent(100, this)">100%</button>
+        </div>
+
+        <input type="number" id="percentInput" class="modal-input" value="100" min="1" max="100" step="1">
+        <small class="modal-hint">Enter a percentage (1-100)</small>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="modal-btn cancel" onclick="closeModal()">Cancel</button>
+        <form method="post" id="closeForm" style="display:inline;">
+          {% csrf_token %}
+          <input type="hidden" name="percent" id="percentHidden" value="100">
+          <button type="submit" class="modal-btn confirm">Confirm Close</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function closeToast(el) {
+      if (!el) return;
+      el.classList.add('hide');
+      setTimeout(function () { el.remove(); }, 400);
+    }
+
+    function highlightPercent(val) {
+      document.querySelectorAll('.percent-btn').forEach(function (b) {
+        b.classList.toggle('active', Number(b.dataset.pct) === Number(val));
+      });
+    }
+
+    function openCloseModal(symbol, qty, label) {
+      document.getElementById('modalLabel').textContent = label + ' (' + symbol + ')';
+      document.getElementById('modalQty').textContent = qty + ' ' + symbol;
+      document.getElementById('closeForm').action = '/close/' + symbol + '/';
+      document.getElementById('percentInput').value = 100;
+      document.getElementById('percentHidden').value = 100;
+      highlightPercent(100);
+      document.getElementById('closeModal').classList.add('active');
+    }
+
+    function closeModal() {
+      document.getElementById('closeModal').classList.remove('active');
+    }
+
+    function setPercent(val, btn) {
+      document.getElementById('percentInput').value = val;
+      document.getElementById('percentHidden').value = val;
+      highlightPercent(val);
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+      // auto-hide toasts
+      document.querySelectorAll('.toast').forEach(function (t, i) {
+        setTimeout(function () { closeToast(t); }, 3500 + i * 200);
+      });
+
+      // typed percentage: clamp 1-100 and sync hidden field
+      var input = document.getElementById('percentInput');
+      var hidden = document.getElementById('percentHidden');
+      if (input) {
+        input.addEventListener('input', function () {
+          var v = parseFloat(input.value);
+          if (isNaN(v)) { hidden.value = ''; highlightPercent(-1); return; }
+          if (v > 100) { v = 100; input.value = 100; }
+          if (v < 1)   { v = 1;   input.value = 1; }
+          hidden.value = v;
+          highlightPercent(v);
+        });
+      }
+
+      // click outside the card closes the modal
+      var overlay = document.getElementById('closeModal');
+      overlay.addEventListener('click', function (e) {
+        if (e.target === overlay) closeModal();
+      });
+
+      // Esc closes the modal
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeModal();
+      });
+    });
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,129 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Contract History</title>
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+
+  <div class="toast-container" id="toastContainer">
+    {% for m in messages %}
+      <div class="toast {{ m.tags }}">
+        <span class="toast-icon">
+          {% if 'success' in m.tags %}✓{% elif 'error' in m.tags %}✕{% else %}ℹ{% endif %}
+        </span>
+        <span class="toast-text">{{ m }}</span>
+        <button class="toast-close" onclick="closeToast(this.parentElement)">×</button>
+      </div>
+    {% endfor %}
+  </div>
+
+  <div class="history-wrap">
+    <div class="history-header">
+      <h2>Contract History</h2>
+      <a href="{% url 'contract_dashboard' %}" class="back-btn">← Back to Contract</a>
+    </div>
+
+    <div class="summary-grid">
+      <div class="summary-card">
+        <div class="label">Total Trades</div>
+        <div class="value">{{ total_count }}</div>
+      </div>
+      <div class="summary-card buy">
+        <div class="label">Wins</div>
+        <div class="value">{{ wins }}</div>
+      </div>
+      <div class="summary-card sell">
+        <div class="label">Losses</div>
+        <div class="value">{{ losses }}</div>
+      </div>
+      <div class="summary-card {% if is_total_profit %}buy{% else %}sell{% endif %}">
+        <div class="label">Total P&L</div>
+        <div class="value">
+          {% if is_total_profit %}+{% endif %}${{ total_pnl|floatformat:2 }}
+        </div>
+      </div>
+    </div>
+
+    <div class="history-card">
+      <table>
+        <thead>
+          <tr>
+            <th>Opened</th>
+            <th>Closed</th>
+            <th>Symbol</th>
+            <th>Direction</th>
+            <th>Leverage</th>
+            <th>Margin</th>
+            <th>Entry</th>
+            <th>Close</th>
+            <th>P&L</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in page_obj %}
+            <tr>
+              <td>{{ p.opened_at|date:"d M, H:i" }}</td>
+              <td>{{ p.closed_at|date:"d M, H:i" }}</td>
+              <td>{{ p.symbol }}</td>
+              <td class="{% if p.direction == 'LONG' %}buy-text{% else %}sell-text{% endif %}">
+                {% if p.direction == 'LONG' %}⬆️ LONG{% else %}⬇️ SHORT{% endif %}
+              </td>
+              <td>{{ p.leverage }}x</td>
+              <td>${{ p.margin|floatformat:2 }}</td>
+              <td>${{ p.entry_price|floatformat:2 }}</td>
+              <td>${{ p.close_price|floatformat:2 }}</td>
+              <td style="color: {% if p.pnl >= 0 %}#16a34a{% else %}#dc2626{% endif %}; font-weight: 700;">
+                {% if p.pnl >= 0 %}+{% endif %}${{ p.pnl|floatformat:2 }}
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="9" style="color:#a08a4f; text-align:center; padding:30px;">
+              No closed positions yet.
+            </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if page_obj.paginator.num_pages > 1 %}
+      <div class="pagination">
+        {% if page_obj.has_previous %}
+          <a href="?page=1">« First</a>
+          <a href="?page={{ page_obj.previous_page_number }}">‹ Prev</a>
+        {% else %}
+          <span class="disabled">« First</span>
+          <span class="disabled">‹ Prev</span>
+        {% endif %}
+
+        <span class="current">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+
+        {% if page_obj.has_next %}
+          <a href="?page={{ page_obj.next_page_number }}">Next ›</a>
+          <a href="?page={{ page_obj.paginator.num_pages }}">Last »</a>
+        {% else %}
+          <span class="disabled">Next ›</span>
+          <span class="disabled">Last »</span>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+
+  <script>
+    function closeToast(el) {
+      if (!el) return;
+      el.classList.add('hide');
+      setTimeout(function () { el.remove(); }, 400);
+    }
+    document.addEventListener('DOMContentLoaded', function () {
+      document.querySelectorAll('.toast').forEach(function (t, i) {
+        setTimeout(function () { closeToast(t); }, 3500 + i * 200);
+      });
+    });
+  </script>
+
+</body>
+</html>

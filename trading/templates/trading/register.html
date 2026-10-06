@@ -1,0 +1,115 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Register</title>
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+  <div class="auth-wrapper">
+    <div class="auth-card">
+      <h2>Register</h2>
+
+      {% if referrer %}
+        <div class="invited-banner">
+          🎁 You were invited by <strong>{{ referrer.username }}</strong>
+        </div>
+      {% endif %}
+
+      {% if form.errors %}
+        <div class="error-box">
+          <strong>Please fix the following errors:</strong>
+          <ul>
+            {% for field, errors in form.errors.items %}
+              {% for error in errors %}
+                <li>{{ error }}</li>
+              {% endfor %}
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+
+      <form method="post">
+        {% csrf_token %}
+
+        <label for="id_username">Username</label>
+        {{ form.username }}
+
+        <label for="id_email">Email</label>
+        {{ form.email }}
+
+        <label for="id_first_name">First Name</label>
+        {{ form.first_name }}
+
+        <label for="id_last_name">Last Name</label>
+        {{ form.last_name }}
+
+        <label for="id_password1">Password</label>
+        <div class="password-wrapper">
+          {{ form.password1 }}
+          <button type="button" class="password-toggle" aria-label="Show password">
+            <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+
+        <label for="id_password2">Password confirmation</label>
+        <div class="password-wrapper">
+          {{ form.password2 }}
+          <button type="button" class="password-toggle" aria-label="Show password">
+            <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+
+        <label for="ref_code">Referral Code (optional)</label>
+        <input type="text" name="ref_code" id="ref_code"
+               value="{{ ref_code|default:'' }}"
+               placeholder="e.g. ali123"
+               class="field">
+        <small class="referral-hint">
+          {% if referrer %}
+            ✓ Pre-filled from link — leave as is
+          {% else %}
+            If someone invited you, enter their username here
+          {% endif %}
+        </small>
+
+        <button type="submit">Create Account</button>
+      </form>
+
+      <div class="auth-link">Already have an account? <a href="{% url 'login' %}">Login</a></div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      document.querySelectorAll('.password-toggle').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+          e.preventDefault();
+          var wrapper = btn.closest('.password-wrapper');
+          var input = wrapper.querySelector('input');
+          if (input.type === 'password') {
+            input.type = 'text';
+            btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+          } else {
+            input.type = 'password';
+            btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+          }
+        });
+      });
+    });
+
+    {% if form.errors %}
+    window.addEventListener('DOMContentLoaded', function() {
+      var msgs = [];
+      {% for field, errors in form.errors.items %}
+        {% for error in errors %}
+          msgs.push("{{ error|escapejs }}");
+        {% endfor %}
+      {% endfor %}
+      if (msgs.length > 0) alert("⚠️ " + msgs.join("\n\n"));
+    });
+    {% endif %}
+  </script>
+</body>
+</html>

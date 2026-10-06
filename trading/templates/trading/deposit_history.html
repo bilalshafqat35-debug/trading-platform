@@ -1,0 +1,94 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Deposit History</title>
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+
+  <div class="history-wrap">
+
+    <div class="history-header">
+      <h2>Deposit History</h2>
+      <a href="{% url 'dashboard' %}" class="back-btn">← Back to Dashboard</a>
+    </div>
+
+    <div class="summary-grid">
+      <div class="summary-card">
+        <div class="label">Total Deposits</div>
+        <div class="value">{{ total_count }}</div>
+      </div>
+      <div class="summary-card buy">
+        <div class="label">Total Amount</div>
+        <div class="value">${{ total_amount|floatformat:2 }}</div>
+      </div>
+      <div class="summary-card">
+        <div class="label">Last Deposit</div>
+        <div class="value">
+          {% if last_deposit %}
+            ${{ last_deposit.amount|floatformat:2 }}
+          {% else %}
+            —
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="history-card">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Date</th>
+            <th>Time</th>
+            <th>Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for d in page_obj %}
+            <tr>
+              <td>{{ forloop.counter0|add:page_obj.start_index }}</td>
+              <td>{{ d.created_at|date:"d M Y" }}</td>
+              <td>{{ d.created_at|date:"H:i" }}</td>
+              <td style="color:#16a34a; font-weight:700;">+${{ d.amount|floatformat:2 }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4" style="color:#a08a4f; text-align:center; padding: 30px;">
+              No deposits yet.
+            </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if page_obj.paginator.num_pages > 1 %}
+      <div class="pagination">
+        {% if page_obj.has_previous %}
+          <a href="?page=1">« First</a>
+          <a href="?page={{ page_obj.previous_page_number }}">‹ Prev</a>
+        {% else %}
+          <span class="disabled">« First</span>
+          <span class="disabled">‹ Prev</span>
+        {% endif %}
+
+        <span class="current">
+          Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+        </span>
+
+        {% if page_obj.has_next %}
+          <a href="?page={{ page_obj.next_page_number }}">Next ›</a>
+          <a href="?page={{ page_obj.paginator.num_pages }}">Last »</a>
+        {% else %}
+          <span class="disabled">Next ›</span>
+          <span class="disabled">Last »</span>
+        {% endif %}
+      </div>
+    {% endif %}
+
+  </div>
+
+</body>
+</html>

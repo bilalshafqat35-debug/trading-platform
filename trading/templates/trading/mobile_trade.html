@@ -1,0 +1,306 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>{{ label }} — Trade</title>
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body class="app-body trade-page-body">
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer">
+    {% for m in messages %}
+      <div class="toast {{ m.tags }}">
+        <span class="toast-icon">
+          {% if 'success' in m.tags %}✓{% elif 'error' in m.tags %}✕{% else %}ℹ{% endif %}
+        </span>
+        <span class="toast-text">{{ m }}</span>
+        <button class="toast-close" onclick="closeToast(this.parentElement)">×</button>
+      </div>
+    {% endfor %}
+  </div>
+
+  <!-- Trade Header -->
+  <div class="trade-header">
+    <a href="{% url 'dashboard' %}" class="trade-back-btn">←</a>
+    <div class="trade-header-info">
+      <div class="trade-header-symbol">{{ symbol }}</div>
+      <div class="trade-header-price" id="tradeHeaderPrice">
+        <span class="price-loading">Loading...</span>
+      </div>
+    </div>
+    <div class="trade-header-balance">
+      ${{ balance|floatformat:2 }}
+    </div>
+  </div>
+
+  <!-- Chart -->
+  <div class="trade-chart-wrapper">
+    <div class="trade-chart-inner">
+      <div class="tradingview-widget-container" style="height:100%;width:100%">
+        <div class="tradingview-widget-container__widget" style="height:100%;width:100%"></div>
+        <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
+        {
+          "symbol": "{{ tv_symbol }}",
+          "interval": "5",
+          "theme": "light",
+          "autosize": true,
+          "timezone": "Etc/UTC",
+          "locale": "en",
+          "hide_side_toolbar": true,
+          "hide_top_toolbar": true,
+          "hide_legend": true,
+          "save_image": false,
+          "allow_symbol_change": false,
+          "withdateranges": false,
+          "details": false
+        }
+        </script>
+      </div>
+    </div>
+  </div>
+
+  <!-- Trade Controls -->
+  <div class="trade-controls">
+
+    <!-- Multiplier -->
+    <div class="trade-section">
+      <label class="trade-label">Multiplier</label>
+      <div class="leverage-buttons-mobile">
+        {% for l in leverage_options %}
+          <button type="button"
+                  class="leverage-btn-mobile {% if l == 1 %}active{% endif %}"
+                  data-leverage="{{ l }}"
+                  onclick="selectLeverage({{ l }}, this)">
+            {{ l }}x
+          </button>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Margin -->
+    <div class="trade-section">
+      <label class="trade-label">Margin (USD)</label>
+      <div class="margin-input-wrap">
+        <span class="margin-prefix">$</span>
+        <input type="number"
+               id="mobileMarginInput"
+               class="margin-input"
+               step="0.01"
+               min="1"
+               placeholder="Min $1">
+      </div>
+      <div class="margin-quick-btns">
+        <button type="button" onclick="setMargin(10)">$10</button>
+        <button type="button" onclick="setMargin(50)">$50</button>
+        <button type="button" onclick="setMargin(100)">$100</button>
+        <button type="button" onclick="setMargin(500)">$500</button>
+      </div>
+    </div>
+
+    <!-- Position Size Display -->
+    <div class="position-size-display" id="positionSizeDisplay" style="display:none;">
+      <span class="ps-label">Position Size</span>
+      <span class="ps-value" id="psValue">$0</span>
+    </div>
+
+    <!-- Open Buttons -->
+    <div class="trade-buttons-row">
+      <button type="button" class="mobile-trade-btn long" onclick="openConfirmModal('LONG')">
+        <span class="mtb-arrow">↑</span>
+        <span class="mtb-text">Open Long</span>
+      </button>
+      <button type="button" class="mobile-trade-btn short" onclick="openConfirmModal('SHORT')">
+        <span class="mtb-arrow">↓</span>
+        <span class="mtb-text">Open Short</span>
+      </button>
+    </div>
+
+  </div>
+
+  <!-- Confirmation Modal -->
+  <div class="modal-overlay" id="confirmModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Confirm Order</h3>
+        <button class="modal-close" onclick="closeConfirmModal()">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="confirm-row">
+          <span class="confirm-label">Symbol</span>
+          <span class="confirm-value">{{ symbol }}</span>
+        </div>
+        <div class="confirm-row">
+          <span class="confirm-label">Direction</span>
+          <span class="confirm-value" id="cfDirection">—</span>
+        </div>
+        <div class="confirm-row">
+          <span class="confirm-label">Multiplier</span>
+          <span class="confirm-value" id="cfLeverage">—</span>
+        </div>
+        <div class="confirm-row">
+          <span class="confirm-label">Margin</span>
+          <span class="confirm-value" id="cfMargin">—</span>
+        </div>
+        <div class="confirm-row">
+          <span class="confirm-label">Position Size</span>
+          <span class="confirm-value" id="cfPositionSize">—</span>
+        </div>
+        <div class="confirm-row">
+          <span class="confirm-label">Entry Price</span>
+          <span class="confirm-value" id="cfPrice">—</span>
+        </div>
+        <div class="confirm-warning">
+          ⚠️ Risk: You can lose your margin if market moves against you.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="modal-btn cancel" onclick="closeConfirmModal()">Cancel</button>
+        <form method="post" action="{% url 'open_position' %}" id="mobileOpenForm" style="display:inline;margin:0;">
+          {% csrf_token %}
+          <input type="hidden" name="symbol" value="{{ symbol }}">
+          <input type="hidden" name="direction" id="formDirection" value="">
+          <input type="hidden" name="leverage" id="formLeverage" value="1">
+          <input type="hidden" name="margin" id="formMargin" value="">
+          <button type="submit" class="modal-btn confirm">Confirm Order</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Success Modal -->
+  <div class="modal-overlay" id="successModal">
+    <div class="modal-card success-card">
+      <div class="success-icon">✓</div>
+      <h3 class="success-title">Order Confirmed</h3>
+      <p class="success-text" id="successText">Your position has been opened successfully.</p>
+      <div class="success-actions">
+        <a href="{% url 'dashboard' %}" class="success-btn secondary">Back to Market</a>
+        <a href="{% url 'contract_dashboard' %}" class="success-btn primary">View Position</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  function closeToast(el) {
+    if (!el) return;
+    el.classList.add('hide');
+    setTimeout(function () { el.remove(); }, 400);
+  }
+
+  var CURRENT_PRICE = null;
+  var SELECTED_LEVERAGE = 1;
+
+  function fetchTradePrice() {
+    fetch('/api/price/{{ symbol }}/')
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.error) return;
+        CURRENT_PRICE = parseFloat(data.price);
+        var el = document.getElementById('tradeHeaderPrice');
+        if (el) {
+          el.textContent = '$' + CURRENT_PRICE.toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 6
+          });
+        }
+      })
+      .catch(function () {});
+  }
+
+  function selectLeverage(value, btn) {
+    document.querySelectorAll('.leverage-btn-mobile').forEach(function (b) {
+      b.classList.remove('active');
+    });
+    btn.classList.add('active');
+    SELECTED_LEVERAGE = value;
+    updatePositionSize();
+  }
+
+  function setMargin(amount) {
+    var input = document.getElementById('mobileMarginInput');
+    if (input) {
+      input.value = amount;
+      updatePositionSize();
+    }
+  }
+
+  function updatePositionSize() {
+    var margin = parseFloat(document.getElementById('mobileMarginInput').value) || 0;
+    var size = margin * SELECTED_LEVERAGE;
+    var display = document.getElementById('positionSizeDisplay');
+    var value = document.getElementById('psValue');
+
+    if (size > 0) {
+      value.textContent = '$' + size.toLocaleString('en-US', { minimumFractionDigits: 2 });
+      display.style.display = 'flex';
+    } else {
+      display.style.display = 'none';
+    }
+  }
+
+  function openConfirmModal(direction) {
+    var margin = parseFloat(document.getElementById('mobileMarginInput').value) || 0;
+
+    if (margin < 1) {
+      alert('Please enter a margin of at least $1');
+      return;
+    }
+
+    if (margin > {{ balance }}) {
+      alert('Insufficient balance. You have ${{ balance|floatformat:2 }}');
+      return;
+    }
+
+    var positionSize = margin * SELECTED_LEVERAGE;
+
+    document.getElementById('cfDirection').textContent = direction + (direction === 'LONG' ? ' (UP)' : ' (DOWN)');
+    document.getElementById('cfLeverage').textContent = SELECTED_LEVERAGE + 'x';
+    document.getElementById('cfMargin').textContent = '$' + margin.toFixed(2);
+    document.getElementById('cfPositionSize').textContent = '$' + positionSize.toFixed(2);
+    document.getElementById('cfPrice').textContent = CURRENT_PRICE ? '$' + CURRENT_PRICE.toFixed(2) : 'Loading...';
+
+    document.getElementById('formDirection').value = direction;
+    document.getElementById('formLeverage').value = SELECTED_LEVERAGE;
+    document.getElementById('formMargin').value = margin;
+
+    document.getElementById('confirmModal').classList.add('active');
+  }
+
+  function closeConfirmModal() {
+    document.getElementById('confirmModal').classList.remove('active');
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.toast').forEach(function (t, i) {
+      setTimeout(function () { closeToast(t); }, 3500 + i * 200);
+    });
+
+    fetchTradePrice();
+    setInterval(fetchTradePrice, 15000);
+
+    var marginInput = document.getElementById('mobileMarginInput');
+    if (marginInput) {
+      marginInput.addEventListener('input', updatePositionSize);
+    }
+
+    var cm = document.getElementById('confirmModal');
+    if (cm) {
+      cm.addEventListener('click', function (e) {
+        if (e.target === cm) closeConfirmModal();
+      });
+    }
+
+    var urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('success') === '1') {
+      var successText = urlParams.get('msg') || 'Your position has been opened successfully.';
+      document.getElementById('successText').textContent = decodeURIComponent(successText);
+      document.getElementById('successModal').classList.add('active');
+    }
+  });
+  </script>
+
+</body>
+</html>

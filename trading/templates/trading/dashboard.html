@@ -1,0 +1,1167 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Trading Platform</title>
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body class="app-body">
+
+  <!-- MOBILE HEADER -->
+  <div class="mobile-brand">
+  <div class="ig-logo-mobile">
+    <span class="ig-main">IG</span>
+    <span class="ig-sub">TRADERS</span>
+  </div>
+</div>
+    <div class="mobile-balance">
+      ${{ balance|floatformat:2 }}
+    </div>
+  </div>
+
+  <!-- DESKTOP HEADER -->
+  <header class="desktop-header">
+    <div class="brand-logo">
+  <div class="ig-logo">
+    <span class="ig-main">IG</span>
+    <span class="ig-sub">TRADERS<sup>®</sup></span>
+  </div>
+</div>
+      <div class="tabs">
+        <a href="?market=crypto" class="{% if market == 'crypto' %}active{% endif %}">Crypto</a>
+        <a href="?market=forex" class="{% if market == 'forex' %}active{% endif %}">Forex</a>
+      </div>
+    </div>
+    <div style="display:flex; align-items:center;">
+      <span class="balance">Balance: ${{ balance|floatformat:2 }} USD</span>
+      <form method="post" action="{% url 'logout' %}" style="display:inline;">
+        {% csrf_token %}
+        <button type="submit" class="logout-btn">Logout</button>
+      </form>
+    </div>
+  </header>
+
+  <!-- Toasts -->
+  <div class="toast-container" id="toastContainer">
+    {% for m in messages %}
+      <div class="toast {{ m.tags }}">
+        <span class="toast-icon">
+          {% if 'success' in m.tags %}✓{% elif 'error' in m.tags %}✕{% else %}ℹ{% endif %}
+        </span>
+        <span class="toast-text">{{ m }}</span>
+        <button class="toast-close" onclick="closeToast(this.parentElement)">×</button>
+      </div>
+    {% endfor %}
+  </div>
+
+  <!-- DESKTOP CONTENT -->
+  <div class="desktop-content">
+
+    <div class="quick-nav">
+      <a href="{% url 'contract_dashboard' %}" class="quick-nav-btn contract-nav-btn">💹 Contract Trading</a>
+      <a href="{% url 'portfolio' %}" class="quick-nav-btn">📈 Portfolio</a>
+      <a href="{% url 'trade_history' %}" class="quick-nav-btn">📊 Trade History</a>
+      <a href="{% url 'deposit_history' %}" class="quick-nav-btn">💰 Deposit History</a>
+      <a href="{% url 'profile' %}" class="quick-nav-btn">👤 Profile</a>
+      <a href="{% url 'invite_friends' %}" class="quick-nav-btn">🎁 Invite Friends</a>
+    </div>
+
+    <div class="layout">
+      <div class="chart-box">
+        <div class="chart-spinner" id="chartSpinner">
+          <div class="spinner-ring"></div>
+        </div>
+        <div class="tradingview-widget-container" style="height:100%;width:100%">
+          <div class="tradingview-widget-container__widget" style="height:100%;width:100%"></div>
+          <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
+          {
+            "symbol": "{{ symbol }}",
+            "interval": "5",
+            "theme": "light",
+            "autosize": true,
+            "timezone": "Etc/UTC",
+            "locale": "en",
+            "allow_symbol_change": true
+          }
+          </script>
+        </div>
+      </div>
+
+      <div class="side">
+        <h3>Funds</h3>
+
+        <div class="funds-buttons">
+          <button type="button" class="fund-btn deposit" onclick="openFundModal('deposit')">
+            <span class="fund-icon">💬</span>
+            <span class="fund-label">Deposit</span>
+          </button>
+          <button type="button" class="fund-btn withdraw" onclick="openFundModal('withdraw')">
+            <span class="fund-icon">💸</span>
+            <span class="fund-label">Withdraw</span>
+          </button>
+        </div>
+
+        <h3>Trade</h3>
+
+        <div class="live-price-box" id="livePriceBox">
+          <div class="live-price-label">Current Price</div>
+          <div class="live-price-value" id="livePriceValue">
+            <span class="price-loading">Loading...</span>
+          </div>
+        </div>
+
+        <form method="post" action="{% url 'trade' %}" id="tradeForm">
+          {% csrf_token %}
+          <select name="symbol" id="tradeSymbol" class="field">
+            {% for key, label in assets %}
+              <option value="{{ key }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+
+          <div class="you-own-box" id="youOwnBox" style="display:none;">
+            You own: <strong id="youOwnValue">—</strong>
+          </div>
+
+          <input type="number" name="amount" id="tradeAmount" step="0.01" min="1" placeholder="Amount (USD)" class="field" required>
+
+          <div class="expected-qty" id="expectedQty" style="display:none;">
+            You will get: <strong id="expectedQtyValue">—</strong>
+          </div>
+
+          <div class="btns">
+            <button name="side" value="BUY" class="buy">Buy</button>
+            <button name="side" value="SELL" class="sell">Sell</button>
+          </div>
+        </form>
+
+        <h3>Trending Coins</h3>
+
+        <div id="coinsSkeleton">
+          <div class="skeleton-coin">
+            <div class="skeleton skeleton-circle"></div>
+            <div class="skeleton skeleton-line"></div>
+            <div class="skeleton skeleton-line short"></div>
+          </div>
+          <div class="skeleton-coin">
+            <div class="skeleton skeleton-circle"></div>
+            <div class="skeleton skeleton-line"></div>
+            <div class="skeleton skeleton-line short"></div>
+          </div>
+          <div class="skeleton-coin">
+            <div class="skeleton skeleton-circle"></div>
+            <div class="skeleton skeleton-line"></div>
+            <div class="skeleton skeleton-line short"></div>
+          </div>
+          <div class="skeleton-coin">
+            <div class="skeleton skeleton-circle"></div>
+            <div class="skeleton skeleton-line"></div>
+            <div class="skeleton skeleton-line short"></div>
+          </div>
+        </div>
+
+        <div id="coinsList" style="display:none;">
+          {% for coin in coins %}
+            <div class="coin">
+              <img src="{{ coin.thumb }}" alt="{{ coin.name }}">
+              <span>{{ coin.name }} ({{ coin.symbol }})</span>
+              <span class="rank">#{{ coin.rank|default:"-" }}</span>
+            </div>
+          {% empty %}
+            <p style="color:#a08a4f;">Trending coins not available right now.</p>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="trades">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h3 style="margin:0;">Recent Trades</h3>
+        <a href="{% url 'trade_history' %}" class="back-btn" style="font-size:13px; padding:6px 14px;">View All →</a>
+      </div>
+      <table>
+        <thead>
+          <tr><th>Time</th><th>Symbol</th><th>Side</th><th>Price</th><th>Quantity</th><th>Amount</th></tr>
+        </thead>
+        <tbody>
+          {% for t in trades %}
+            <tr>
+              <td>{{ t.created_at|date:"d M H:i" }}</td>
+              <td>{{ t.symbol }}</td>
+              <td class="{{ t.side|lower }}-text">{{ t.side }}</td>
+              <td>{{ t.price }}</td>
+              <td>{{ t.quantity }}</td>
+              <td>${{ t.amount }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="6" style="color:#a08a4f;">No trades yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <!-- MOBILE CONTENT -->
+  <div class="mobile-content">
+
+    <!-- MARKET TAB -->
+    <div class="mobile-tab-content active" id="tab-market">
+      <div class="mobile-tab-header">
+        <h2>Market</h2>
+      </div>
+      <div class="market-list" id="marketList">
+        <div class="market-item-skeleton">
+          <div class="skeleton" style="width:36px;height:36px;border-radius:50%;"></div>
+          <div class="skeleton" style="width:60px;height:24px;"></div>
+          <div class="skeleton" style="flex:1;height:16px;"></div>
+          <div class="skeleton" style="width:100px;height:32px;"></div>
+        </div>
+        <div class="market-item-skeleton">
+          <div class="skeleton" style="width:36px;height:36px;border-radius:50%;"></div>
+          <div class="skeleton" style="width:60px;height:24px;"></div>
+          <div class="skeleton" style="flex:1;height:16px;"></div>
+          <div class="skeleton" style="width:100px;height:32px;"></div>
+        </div>
+        <div class="market-item-skeleton">
+          <div class="skeleton" style="width:36px;height:36px;border-radius:50%;"></div>
+          <div class="skeleton" style="width:60px;height:24px;"></div>
+          <div class="skeleton" style="flex:1;height:16px;"></div>
+          <div class="skeleton" style="width:100px;height:32px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ORDERS TAB -->
+<div class="mobile-tab-content" id="tab-orders">
+  <div class="mobile-tab-header">
+    <h2>Orders</h2>
+  </div>
+
+  <!-- Sub-tabs -->
+  <div class="orders-subtabs">
+    <button type="button" class="orders-subtab active" data-subtab="positions" onclick="switchOrdersSubTab('positions', this)">
+      Positions
+    </button>
+    <button type="button" class="orders-subtab" data-subtab="pending" onclick="switchOrdersSubTab('pending', this)">
+      Pending
+    </button>
+    <button type="button" class="orders-subtab" data-subtab="history" onclick="switchOrdersSubTab('history', this)">
+      History
+    </button>
+  </div>
+
+  <!-- Positions Sub-tab -->
+  <div class="orders-subcontent active" id="subtab-positions">
+    <div class="orders-summary-strip" id="ordersSummary" style="display:none;">
+      <div class="os-item">
+        <span class="os-label">Total P&L</span>
+        <span class="os-value" id="osTotalPnl">$0.00</span>
+      </div>
+      <div class="os-item">
+        <span class="os-label">In Use</span>
+        <span class="os-value" id="osTotalMargin">$0.00</span>
+      </div>
+      <div class="os-item">
+        <span class="os-label">Count</span>
+        <span class="os-value" id="osCount">0</span>
+      </div>
+    </div>
+    <div id="positionsList">
+      <div class="mobile-empty">
+        <div class="mobile-empty-icon">⏳</div>
+        <p>Loading positions...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pending Sub-tab -->
+  <div class="orders-subcontent" id="subtab-pending">
+    <div class="mobile-empty">
+      <div class="mobile-empty-icon">📋</div>
+      <p>No pending orders</p>
+      <p style="font-size:12px; color:#bbb; margin-top:6px;">Limit orders coming soon</p>
+    </div>
+  </div>
+
+ <!-- History Sub-tab -->
+<div class="orders-subcontent" id="subtab-history">
+  <div class="history-summary-strip" id="historySummary" style="display:none;">
+    <div class="hs-item">
+      <span class="hs-label">Total</span>
+      <span class="hs-value" id="hsTotal">0</span>
+    </div>
+    <div class="hs-item">
+      <span class="hs-label">Wins</span>
+      <span class="hs-value" id="hsWins" style="color:#16a34a;">0</span>
+    </div>
+    <div class="hs-item">
+      <span class="hs-label">Losses</span>
+      <span class="hs-value" id="hsLosses" style="color:#dc2626;">0</span>
+    </div>
+    <div class="hs-item">
+      <span class="hs-label">Total P&L</span>
+      <span class="hs-value" id="hsPnl">$0.00</span>
+    </div>
+  </div>
+
+  <div id="historyList">
+    <div class="mobile-empty">
+      <div class="mobile-empty-icon">⏳</div>
+      <p>Loading history...</p>
+    </div>
+  </div>
+</div>
+</div>
+
+    <!-- NEWS TAB -->
+<div class="mobile-tab-content" id="tab-news">
+  <div class="mobile-tab-header">
+    <h2>News</h2>
+  </div>
+
+  <!-- Market Update Ticker -->
+  <div class="news-ticker">
+    <div class="news-ticker-label">LIVE</div>
+    <div class="news-ticker-content" id="newsTickerContent">
+      <span class="news-ticker-loading">Loading market updates...</span>
+    </div>
+  </div>
+
+  <!-- Quick Stats -->
+  <div class="news-stats-grid" id="newsStatsGrid">
+    <div class="news-stat-card">
+      <div class="ns-label">BTC 24h</div>
+      <div class="ns-value" id="nsBtc">—</div>
+    </div>
+    <div class="news-stat-card">
+      <div class="ns-label">ETH 24h</div>
+      <div class="ns-value" id="nsEth">—</div>
+    </div>
+    <div class="news-stat-card">
+      <div class="ns-label">EUR/USD</div>
+      <div class="ns-value" id="nsEur">—</div>
+    </div>
+    <div class="news-stat-card">
+      <div class="ns-label">GBP/USD</div>
+      <div class="ns-value" id="nsGbp">—</div>
+    </div>
+  </div>
+
+  <!-- News Feed -->
+  <div class="news-feed-header">
+    <h3>Market News</h3>
+    <button type="button" class="news-refresh-btn" onclick="loadNewsFeed()">↻ Refresh</button>
+  </div>
+
+  <div class="news-feed" id="newsFeed">
+    <div class="mobile-empty">
+      <div class="mobile-empty-icon">📰</div>
+      <p>Loading news...</p>
+    </div>
+  </div>
+</div>
+
+    <!-- MINE TAB -->
+    <div class="mobile-tab-content" id="tab-mine">
+      <div class="mobile-tab-header">
+        <h2>Mine</h2>
+      </div>
+      <div class="mobile-mine">
+        <div class="mine-account-card">
+          <div class="mine-label">Simulation Account</div>
+          <div class="mine-user">{{ request.user.username }}</div>
+          <div class="mine-balance">${{ balance|floatformat:2 }}</div>
+          <div class="mine-balance-label">Available Assets</div>
+        </div>
+
+        <div class="mine-actions">
+          <button type="button" class="mine-action-btn deposit" onclick="openFundModal('deposit')">
+            <div class="mine-action-icon">💬</div>
+            <div class="mine-action-text">
+              <div class="mine-action-title">Deposit</div>
+              <div class="mine-action-sub">Billing Details</div>
+            </div>
+          </button>
+          <button type="button" class="mine-action-btn withdraw" onclick="openFundModal('withdraw')">
+            <div class="mine-action-icon">💸</div>
+            <div class="mine-action-text">
+              <div class="mine-action-title">Withdrawal</div>
+              <div class="mine-action-sub">Billing Details</div>
+            </div>
+          </button>
+        </div>
+
+        <div class="mine-menu">
+          <a href="{% url 'portfolio' %}" class="mine-menu-item">
+            <div class="mine-menu-icon">📊</div>
+            <span class="mine-menu-label">Portfolio</span>
+            <span class="mine-menu-arrow">›</span>
+          </a>
+          <a href="{% url 'contract_dashboard' %}" class="mine-menu-item">
+            <div class="mine-menu-icon">💹</div>
+            <span class="mine-menu-label">Contract Trading</span>
+            <span class="mine-menu-arrow">›</span>
+          </a>
+          <a href="{% url 'trade_history' %}" class="mine-menu-item">
+            <div class="mine-menu-icon">📈</div>
+            <span class="mine-menu-label">Trade History</span>
+            <span class="mine-menu-arrow">›</span>
+          </a>
+          <a href="{% url 'deposit_history' %}" class="mine-menu-item">
+            <div class="mine-menu-icon">💰</div>
+            <span class="mine-menu-label">Deposit History</span>
+            <span class="mine-menu-arrow">›</span>
+          </a>
+          <a href="{% url 'invite_friends' %}" class="mine-menu-item">
+            <div class="mine-menu-icon">🎁</div>
+            <span class="mine-menu-label">Invite Friends</span>
+            <span class="mine-menu-arrow">›</span>
+          </a>
+          <a href="{% url 'profile' %}" class="mine-menu-item">
+            <div class="mine-menu-icon">👤</div>
+            <span class="mine-menu-label">Profile</span>
+            <span class="mine-menu-arrow">›</span>
+          </a>
+          <a href="{% url 'change_password' %}" class="mine-menu-item">
+            <div class="mine-menu-icon">🔒</div>
+            <span class="mine-menu-label">Change Password</span>
+            <span class="mine-menu-arrow">›</span>
+          </a>
+        </div>
+
+        <form method="post" action="{% url 'logout' %}" class="mobile-logout-form">
+          {% csrf_token %}
+          <button type="submit" class="mine-logout-btn">
+            <div class="mine-menu-icon">🚪</div>
+            <span class="mine-menu-label">Logout</span>
+            <span class="mine-menu-arrow">›</span>
+          </button>
+        </form>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- MOBILE BOTTOM NAV -->
+  <nav class="mobile-bottom-nav">
+    <button class="mobile-nav-btn active" data-tab="market" onclick="switchMobileTab('market', this)">
+      <div class="mobile-nav-icon">📊</div>
+      <div class="mobile-nav-label">Market</div>
+    </button>
+    <button class="mobile-nav-btn" data-tab="orders" onclick="switchMobileTab('orders', this)">
+      <div class="mobile-nav-icon">📋</div>
+      <div class="mobile-nav-label">Orders</div>
+    </button>
+    <button class="mobile-nav-btn" data-tab="news" onclick="switchMobileTab('news', this)">
+      <div class="mobile-nav-icon">📰</div>
+      <div class="mobile-nav-label">News</div>
+    </button>
+    <button class="mobile-nav-btn" data-tab="mine" onclick="switchMobileTab('mine', this)">
+      <div class="mobile-nav-icon">👤</div>
+      <div class="mobile-nav-label">Mine</div>
+    </button>
+  </nav>
+
+  <!-- FUND MODAL -->
+  <div class="modal-overlay" id="fundModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="fundModalTitle">Deposit Funds</h3>
+        <button class="modal-close" onclick="closeFundModal()">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="fund-modal-icon" id="fundModalIcon">💬</div>
+        <p class="fund-modal-text" id="fundModalText">
+          Do you want to <strong>deposit</strong> from our AI customer services?
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="modal-btn cancel" onclick="closeFundModal()">Cancel</button>
+        <a href="#" id="fundModalConfirm" target="_blank" rel="noopener" class="modal-btn confirm">
+          Yes, Continue
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  // ============================================================
+  // UTILS
+  // ============================================================
+  function closeToast(el) {
+    if (!el) return;
+    el.classList.add('hide');
+    setTimeout(function () { el.remove(); }, 400);
+  }
+
+  // ============================================================
+  // MOBILE TAB SWITCH
+  // ============================================================
+  function switchMobileTab(tabName, btn) {
+    document.querySelectorAll('.mobile-tab-content').forEach(function (el) {
+      el.classList.remove('active');
+    });
+    var target = document.getElementById('tab-' + tabName);
+    if (target) target.classList.add('active');
+
+    document.querySelectorAll('.mobile-nav-btn').forEach(function (b) {
+      b.classList.remove('active');
+    });
+    if (btn) btn.classList.add('active');
+  }
+
+  // ============================================================
+  // FUNDS MODAL
+  // ============================================================
+  var TELEGRAM_URL = "https://t.me/Client_service_Awailable";
+  var CURRENT_USERNAME = "{{ request.user.username }}";
+
+  function openFundModal(type) {
+    var modal = document.getElementById('fundModal');
+    var title = document.getElementById('fundModalTitle');
+    var icon = document.getElementById('fundModalIcon');
+    var text = document.getElementById('fundModalText');
+    var confirmBtn = document.getElementById('fundModalConfirm');
+
+    var message = '';
+        if (type === 'deposit') {
+      title.textContent = 'Customer Service';
+      icon.textContent = '💬';
+      text.innerHTML = 'Do you want to connect with our customer service?';
+      message = 'Hi, I want to deposit funds. My username: ' + CURRENT_USERNAME;
+    } else {
+      title.textContent = 'Customer Service';
+      icon.textContent = '💬';
+      text.innerHTML = 'Do you want to connect with our customer service?';
+      message = 'Hi, I want to withdraw funds. My username: ' + CURRENT_USERNAME;
+    }
+
+    confirmBtn.href = TELEGRAM_URL + '?text=' + encodeURIComponent(message);
+    modal.classList.add('active');
+  }
+
+  function closeFundModal() {
+    var m = document.getElementById('fundModal');
+    if (m) m.classList.remove('active');
+  }
+
+  // ============================================================
+  // MARKET TAB — LOAD LIST
+  // ============================================================
+  function renderMarketList(symbols) {
+  var container = document.getElementById('marketList');
+  if (!container) return;
+
+  if (!symbols || symbols.length === 0) {
+    container.innerHTML = '<p style="text-align:center; color:#999; padding:40px 20px;">No market data available</p>';
+    return;
+  }
+
+  var html = '';
+  symbols.forEach(function (s) {
+    var isUp = s.change_pct >= 0;
+    var changeClass = isUp ? 'up' : 'down';
+    var arrow = isUp ? '▲' : '▼';
+    var sign = isUp ? '+' : '';
+    var sparkColor = isUp ? '#16a34a' : '#dc2626';
+
+    html += '<div class="market-item" onclick="openTradePage(\'' + s.symbol + '\')">';
+
+    // LEFT: icon image + symbol
+    html += '  <div class="market-item-left">';
+    html += '    <div class="market-item-icon">';
+    if (s.icon_img) {
+      html += '      <img src="' + s.icon_img + '" alt="' + s.symbol + '" onerror="this.style.display=\'none\';this.parentNode.textContent=\'' + s.symbol.substring(0,2) + '\';">';
+    } else {
+      html += s.symbol.substring(0, 2);
+    }
+    html += '    </div>';
+    html += '    <div class="market-item-symbol">' + s.symbol + '</div>';
+    html += '  </div>';
+
+    // MIDDLE: price + change
+    html += '  <div class="market-item-middle">';
+    html += '    <div class="market-item-current">' + formatPrice(s.price) + '</div>';
+    html += '    <div class="market-item-change ' + changeClass + '">' + sign + s.change_pct.toFixed(2) + '% ' + arrow + '</div>';
+    html += '  </div>';
+
+    // RIGHT: sparkline
+    html += '  <div class="market-item-spark">';
+    if (s.spark && s.spark.length >= 2) {
+      html += '    <svg viewBox="0 0 100 32" preserveAspectRatio="none" class="sparkline">';
+      html += '      ' + generateSparkPath(s.spark, sparkColor);
+      html += '    </svg>';
+    } else {
+      html += '    <svg viewBox="0 0 100 32" preserveAspectRatio="none" class="sparkline">';
+      html += '      <line x1="0" y1="16" x2="100" y2="16" stroke="#e5e5e5" stroke-width="1.5" stroke-dasharray="3,3"/>';
+      html += '    </svg>';
+    }
+    html += '  </div>';
+
+    html += '</div>';
+  });
+
+  container.innerHTML = html;
+}
+
+  function formatPrice(p) {
+    var num = parseFloat(p);
+    if (num >= 1000) return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    if (num >= 100) return num.toFixed(3);
+    if (num >= 1) return num.toFixed(3);
+    return num.toFixed(5);
+  }
+
+  function generateSparkPath(points, color) {
+    if (!points || points.length < 2) return '';
+
+    var min = Math.min.apply(null, points);
+    var max = Math.max.apply(null, points);
+    var range = max - min || 1;
+
+    var width = 100;
+    var height = 32;
+    var step = width / (points.length - 1);
+
+    var pathD = '';
+    points.forEach(function (p, i) {
+      var x = i * step;
+      var y = height - ((p - min) / range) * (height - 4) - 2;
+      pathD += (i === 0 ? 'M' : 'L') + x.toFixed(2) + ',' + y.toFixed(2) + ' ';
+    });
+
+    var areaD = pathD + 'L' + width + ',' + height + ' L0,' + height + ' Z';
+
+    return '<path d="' + areaD + '" fill="' + color + '" opacity="0.12"/>' +
+           '<path d="' + pathD + '" fill="none" stroke="' + color + '" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>';
+  }
+
+  function loadMarketList() {
+  var container = document.getElementById('marketList');
+  if (!container) return;
+
+  fetch('/api/market-list/')
+    .then(function (r) { 
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json(); 
+    })
+    .then(function (data) {
+      var symbols = data.symbols || [];
+      
+      // Agar sab symbols ka price nahi aa raha to retry
+      if (symbols.length === 0) {
+        console.log('[Market] Empty response — retrying in 5s');
+        setTimeout(loadMarketList, 5000);
+        return;
+      }
+      
+      renderMarketList(symbols);
+    })
+    .catch(function (err) {
+      console.log('[Market] Error:', err);
+      // Retry in 5 seconds
+      setTimeout(loadMarketList, 5000);
+    });
+}
+
+  function openTradePage(symbol) {
+  // Mobile trade page par redirect karo
+  window.location.href = '/mobile/trade/' + symbol + '/';
+}
+
+  // ============================================================
+  // DESKTOP — Live price, holding, etc.
+  // ============================================================
+  document.addEventListener('DOMContentLoaded', function () {
+    // Toasts
+    document.querySelectorAll('.toast').forEach(function (t, i) {
+      setTimeout(function () { closeToast(t); }, 3500 + i * 200);
+    });
+
+    // Skeletons
+    var coinsSkeleton = document.getElementById('coinsSkeleton');
+    var coinsList = document.getElementById('coinsList');
+    if (coinsSkeleton && coinsList) {
+      setTimeout(function () {
+        coinsSkeleton.style.display = 'none';
+        coinsList.style.display = 'block';
+      }, 1200);
+    }
+
+    var chartSpinner = document.getElementById('chartSpinner');
+    if (chartSpinner) {
+      setTimeout(function () { chartSpinner.classList.add('hidden'); }, 1800);
+    }
+
+    // Modal outside click
+    var fundModal = document.getElementById('fundModal');
+    if (fundModal) {
+      fundModal.addEventListener('click', function (e) {
+        if (e.target === fundModal) closeFundModal();
+      });
+    }
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closeFundModal();
+    });
+
+    // Desktop live price
+    var priceBox = document.getElementById('livePriceValue');
+    var symbolSelect = document.getElementById('tradeSymbol');
+    var amountInput = document.getElementById('tradeAmount');
+    var expectedQty = document.getElementById('expectedQty');
+    var expectedQtyValue = document.getElementById('expectedQtyValue');
+    var youOwnBox = document.getElementById('youOwnBox');
+    var youOwnValue = document.getElementById('youOwnValue');
+
+    if (priceBox && symbolSelect) {
+      var currentPrice = null;
+
+      var fetchPrice = function () {
+        var symbol = symbolSelect.value;
+        fetch('/api/price/' + symbol + '/')
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (data.error) {
+              priceBox.innerHTML = '<span class="price-loading">Unavailable</span>';
+              currentPrice = null;
+              return;
+            }
+            currentPrice = parseFloat(data.price);
+            priceBox.textContent = '$' + currentPrice.toLocaleString('en-US', {
+              minimumFractionDigits: 2, maximumFractionDigits: 6
+            });
+            updateQuantity();
+          })
+          .catch(function () {
+            priceBox.innerHTML = '<span class="price-loading">Error</span>';
+          });
+      };
+
+      var fetchHolding = function () {
+        var symbol = symbolSelect.value;
+        fetch('/api/holding/' + symbol + '/')
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (!youOwnBox || !youOwnValue) return;
+            if (data.error || parseFloat(data.quantity) <= 0) {
+              youOwnBox.style.display = 'none';
+            } else {
+              youOwnValue.textContent = data.quantity + ' ' + data.symbol;
+              youOwnBox.style.display = 'block';
+            }
+          });
+      };
+
+      var updateQuantity = function () {
+        if (!amountInput || !expectedQty || !expectedQtyValue) return;
+        var amount = parseFloat(amountInput.value);
+        if (!currentPrice || !amount || amount <= 0) {
+          expectedQty.style.display = 'none';
+          return;
+        }
+        var qty = amount / currentPrice;
+        var unit = symbolSelect.value.replace('USD', '');
+        expectedQtyValue.textContent = qty.toFixed(8) + ' ' + unit;
+        expectedQty.style.display = 'block';
+      };
+
+      symbolSelect.addEventListener('change', function () {
+        priceBox.innerHTML = '<span class="price-loading">Loading...</span>';
+        fetchPrice();
+        fetchHolding();
+        updateQuantity();
+      });
+
+      if (amountInput) {
+        amountInput.addEventListener('input', updateQuantity);
+      }
+
+      fetchPrice();
+      fetchHolding();
+      setInterval(fetchPrice, 30000);
+    }
+
+    // Load market list if mobile
+    if (window.innerWidth <= 768) {
+      setTimeout(loadMarketList, 300);
+    }
+
+    // Refresh market every 60s if Market tab active
+    setInterval(function () {
+      if (window.innerWidth <= 768) {
+        var marketTab = document.getElementById('tab-market');
+        if (marketTab && marketTab.classList.contains('active')) {
+          loadMarketList();
+        }
+      }
+    }, 60000);
+  });
+  // ============================================================
+// ORDERS TAB — SUB-TABS + POSITIONS
+// ============================================================
+function switchOrdersSubTab(name, btn) {
+  document.querySelectorAll('.orders-subtab').forEach(function (b) {
+    b.classList.remove('active');
+  });
+  btn.classList.add('active');
+
+  document.querySelectorAll('.orders-subcontent').forEach(function (c) {
+    c.classList.remove('active');
+  });
+  var target = document.getElementById('subtab-' + name);
+  if (target) target.classList.add('active');
+
+  if (name === 'positions') {
+    loadMobilePositions();
+  } else if (name === 'history') {
+    loadMobileHistory();
+  }
+}
+
+function loadMobilePositions() {
+  var container = document.getElementById('positionsList');
+  if (!container) return;
+
+  fetch('/api/mobile-positions/')
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      var positions = data.positions || [];
+
+      // Summary update
+      var summary = document.getElementById('ordersSummary');
+      if (summary) {
+        if (positions.length > 0) {
+          summary.style.display = 'flex';
+          var pnlEl = document.getElementById('osTotalPnl');
+          pnlEl.textContent = (data.is_profit ? '+' : '') + '$' + data.total_pnl;
+          pnlEl.style.color = data.is_profit ? '#16a34a' : '#dc2626';
+          document.getElementById('osTotalMargin').textContent = '$' + data.total_margin;
+          document.getElementById('osCount').textContent = data.count;
+        } else {
+          summary.style.display = 'none';
+        }
+      }
+
+      // Empty state
+      if (positions.length === 0) {
+        container.innerHTML = '<div class="mobile-empty">' +
+          '<div class="mobile-empty-icon">📊</div>' +
+          '<p>No open positions</p>' +
+          '<p style="font-size:12px; color:#bbb; margin-top:6px;">Open a Long or Short from Market tab</p>' +
+          '</div>';
+        return;
+      }
+
+      // Render positions
+      var html = '';
+      positions.forEach(function (p) {
+        var isLong = p.direction === 'LONG';
+        var dirClass = isLong ? 'long' : 'short';
+        var dirArrow = isLong ? '⬆️' : '⬇️';
+        var pnlClass = p.is_profit ? 'profit' : 'loss';
+        var pnlSign = p.is_profit ? '+' : '';
+
+        html += '<div class="order-position-card ' + dirClass + '">';
+        html += '  <div class="opc-header">';
+        html += '    <div class="opc-symbol">' + p.symbol + '</div>';
+        html += '    <div class="opc-badge ' + dirClass + '">' + dirArrow + ' ' + p.direction + ' ' + p.leverage + 'x</div>';
+        html += '  </div>';
+        html += '  <div class="opc-rows">';
+        html += '    <div class="opc-row"><span class="opc-label">Entry</span><span class="opc-val">$' + parseFloat(p.entry_price).toFixed(2) + '</span></div>';
+        html += '    <div class="opc-row"><span class="opc-label">Current</span><span class="opc-val">$' + parseFloat(p.current_price).toFixed(2) + '</span></div>';
+        html += '    <div class="opc-row"><span class="opc-label">Margin</span><span class="opc-val">$' + parseFloat(p.margin).toFixed(2) + '</span></div>';
+        html += '    <div class="opc-row"><span class="opc-label">Size</span><span class="opc-val">$' + parseFloat(p.position_size).toFixed(2) + '</span></div>';
+        html += '    <div class="opc-row ' + pnlClass + '"><span class="opc-label">P&L</span><span class="opc-val">' + pnlSign + '$' + parseFloat(p.pnl).toFixed(2) + ' (' + pnlSign + p.pnl_pct + '%)</span></div>';
+        html += '  </div>';
+        html += '  <button type="button" class="opc-close-btn" onclick="closeMobilePosition(' + p.id + ')">Close Position</button>';
+        html += '</div>';
+      });
+
+      container.innerHTML = html;
+    })
+    .catch(function (err) {
+      console.log('[Orders] Error:', err);
+      container.innerHTML = '<div class="mobile-empty">' +
+        '<div class="mobile-empty-icon">⚠️</div>' +
+        '<p>Failed to load positions</p>' +
+        '</div>';
+    });
+}
+
+function closeMobilePosition(positionId) {
+  if (!confirm('Are you sure you want to close this position?')) return;
+
+  // Form banao aur submit karo
+  var form = document.createElement('form');
+  form.method = 'POST';
+  form.action = '/contract/close/' + positionId + '/';
+
+  var csrf = document.createElement('input');
+  csrf.type = 'hidden';
+  csrf.name = 'csrfmiddlewaretoken';
+  csrf.value = getCsrfToken();
+  form.appendChild(csrf);
+
+  document.body.appendChild(form);
+  form.submit();
+}
+
+function getCsrfToken() {
+  var match = document.cookie.match(/csrftoken=([^;]+)/);
+  return match ? match[1] : '';
+}
+
+// Auto-refresh positions every 30s if Orders tab active
+setInterval(function () {
+  if (window.innerWidth <= 768) {
+    var ordersTab = document.getElementById('tab-orders');
+    var positionsSub = document.getElementById('subtab-positions');
+    if (ordersTab && ordersTab.classList.contains('active') && positionsSub && positionsSub.classList.contains('active')) {
+      loadMobilePositions();
+    }
+  }
+}, 30000);
+
+// When orders tab is switched, load positions
+document.addEventListener('DOMContentLoaded', function () {
+  var origSwitch = window.switchMobileTab;
+  window.switchMobileTab = function (tabName, btn) {
+    if (origSwitch) origSwitch(tabName, btn);
+    if (tabName === 'orders') {
+      setTimeout(loadMobilePositions, 200);
+    }
+  };
+});
+// ============================================================
+// HISTORY SUB-TAB
+// ============================================================
+function loadMobileHistory() {
+  var container = document.getElementById('historyList');
+  if (!container) return;
+
+  fetch('/api/mobile-history/')
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      var history = data.history || [];
+
+      // Summary update
+      var summary = document.getElementById('historySummary');
+      if (summary) {
+        if (history.length > 0) {
+          summary.style.display = 'flex';
+          document.getElementById('hsTotal').textContent = data.total_count;
+          document.getElementById('hsWins').textContent = data.wins;
+          document.getElementById('hsLosses').textContent = data.losses;
+
+          var pnlEl = document.getElementById('hsPnl');
+          pnlEl.textContent = (data.is_profit ? '+' : '') + '$' + data.total_pnl;
+          pnlEl.style.color = data.is_profit ? '#16a34a' : '#dc2626';
+        } else {
+          summary.style.display = 'none';
+        }
+      }
+
+      // Empty
+      if (history.length === 0) {
+        container.innerHTML = '<div class="mobile-empty">' +
+          '<div class="mobile-empty-icon">📜</div>' +
+          '<p>No history yet</p>' +
+          '<p style="font-size:12px; color:#bbb; margin-top:6px;">Closed positions will appear here</p>' +
+          '</div>';
+        return;
+      }
+
+      // Render
+      var html = '';
+      history.forEach(function (h) {
+        var isLong = h.direction === 'LONG';
+        var dirClass = isLong ? 'long' : 'short';
+        var dirArrow = isLong ? '⬆️' : '⬇️';
+        var pnlClass = h.is_profit ? 'profit' : 'loss';
+        var pnlSign = h.is_profit ? '+' : '';
+
+        html += '<div class="history-card-item ' + dirClass + '">';
+        html += '  <div class="hci-header">';
+        html += '    <div class="hci-symbol">' + h.symbol + '</div>';
+        html += '    <div class="hci-badge ' + dirClass + '">' + dirArrow + ' ' + h.direction + ' ' + h.leverage + 'x</div>';
+        html += '  </div>';
+        html += '  <div class="hci-rows">';
+        html += '    <div class="hci-row"><span class="hci-label">Entry</span><span class="hci-val">$' + parseFloat(h.entry_price).toFixed(2) + '</span></div>';
+        html += '    <div class="hci-row"><span class="hci-label">Close</span><span class="hci-val">$' + parseFloat(h.close_price).toFixed(2) + '</span></div>';
+        html += '    <div class="hci-row"><span class="hci-label">Margin</span><span class="hci-val">$' + parseFloat(h.margin).toFixed(2) + '</span></div>';
+        html += '    <div class="hci-row ' + pnlClass + '"><span class="hci-label">P&L</span><span class="hci-val">' + pnlSign + '$' + parseFloat(h.pnl).toFixed(2) + '</span></div>';
+        html += '  </div>';
+        html += '  <div class="hci-times">';
+        html += '    <span>Opened: ' + h.opened_at + '</span>';
+        html += '    <span>Closed: ' + h.closed_at + '</span>';
+        html += '  </div>';
+        html += '</div>';
+      });
+
+      container.innerHTML = html;
+    })
+    .catch(function (err) {
+      console.log('[History] Error:', err);
+      container.innerHTML = '<div class="mobile-empty">' +
+        '<div class="mobile-empty-icon">⚠️</div>' +
+        '<p>Failed to load history</p>' +
+        '</div>';
+    });
+}
+// ============================================================
+// NEWS TAB
+// ============================================================
+var CRYPTO_NEWS = [
+  {
+    title: "Bitcoin maintains support above key level as institutional interest grows",
+    source: "Market Watch",
+    time: "2h ago",
+    tag: "BTC"
+  },
+  {
+    title: "Ethereum network activity reaches new milestone with Layer-2 adoption",
+    source: "CoinDesk",
+    time: "4h ago",
+    tag: "ETH"
+  },
+  {
+    title: "Solana sees increased developer activity amid ecosystem expansion",
+    source: "The Block",
+    time: "6h ago",
+    tag: "SOL"
+  },
+  {
+    title: "Fed signals possible rate decision impact on global currencies",
+    source: "Reuters",
+    time: "8h ago",
+    tag: "FOREX"
+  },
+  {
+    title: "Crypto market sentiment turns positive as volatility decreases",
+    source: "Bloomberg",
+    time: "10h ago",
+    tag: "MARKET"
+  },
+  {
+    title: "Major exchanges report increased trading volume across spot markets",
+    source: "CryptoNews",
+    time: "12h ago",
+    tag: "MARKET"
+  },
+  {
+    title: "USD strength continues as investors await economic data releases",
+    source: "FX Street",
+    time: "14h ago",
+    tag: "FOREX"
+  },
+  {
+    title: "Altcoin season indicators show mixed signals across major pairs",
+    source: "CoinTelegraph",
+    time: "16h ago",
+    tag: "MARKET"
+  }
+];
+
+function loadNewsFeed() {
+  var container = document.getElementById('newsFeed');
+  if (!container) return;
+
+  container.innerHTML = '<div class="mobile-empty"><div class="mobile-empty-icon">⏳</div><p>Loading news...</p></div>';
+
+  setTimeout(function () {
+    var html = '';
+    CRYPTO_NEWS.forEach(function (n) {
+      var tagColor = '#6b5b2e';
+      if (n.tag === 'BTC') tagColor = '#f7931a';
+      else if (n.tag === 'ETH') tagColor = '#627eea';
+      else if (n.tag === 'SOL') tagColor = '#9945ff';
+      else if (n.tag === 'FOREX') tagColor = '#16a34a';
+
+      html += '<div class="news-item">';
+      html += '  <div class="news-item-header">';
+      html += '    <span class="news-tag" style="background:' + tagColor + '15; color:' + tagColor + ';">' + n.tag + '</span>';
+      html += '    <span class="news-time">' + n.time + '</span>';
+      html += '  </div>';
+      html += '  <div class="news-item-title">' + n.title + '</div>';
+      html += '  <div class="news-item-source">— ' + n.source + '</div>';
+      html += '</div>';
+    });
+    container.innerHTML = html;
+  }, 400);
+}
+
+function loadNewsStats() {
+  var symbols = [
+    { id: 'nsBtc', symbol: 'BTC' },
+    { id: 'nsEth', symbol: 'ETH' },
+    { id: 'nsEur', symbol: 'EURUSD' },
+    { id: 'nsGbp', symbol: 'GBPUSD' }
+  ];
+
+  symbols.forEach(function (s) {
+    fetch('/api/price/' + s.symbol + '/')
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var el = document.getElementById(s.id);
+        if (!el || data.error) return;
+
+        var price = parseFloat(data.price);
+        var formatted = price >= 1000 
+          ? '$' + price.toLocaleString('en-US', { maximumFractionDigits: 2 })
+          : '$' + price.toFixed(4);
+        el.textContent = formatted;
+        el.style.color = '#1a1a1a';
+      })
+      .catch(function () {});
+  });
+}
+
+function loadNewsTicker() {
+  var ticker = document.getElementById('newsTickerContent');
+  if (!ticker) return;
+
+  fetch('/api/market-list/')
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      var symbols = data.symbols || [];
+      if (symbols.length === 0) return;
+
+      var html = '';
+      symbols.forEach(function (s, i) {
+        var isUp = s.change_pct >= 0;
+        var arrow = isUp ? '▲' : '▼';
+        var sign = isUp ? '+' : '';
+        var color = isUp ? '#16a34a' : '#dc2626';
+
+        html += '<span class="ticker-item">';
+        html += '<strong>' + s.symbol + '</strong> ';
+        html += '<span style="color:' + color + ';">' + sign + s.change_pct.toFixed(2) + '% ' + arrow + '</span>';
+        html += '</span>';
+        if (i < symbols.length - 1) {
+          html += '<span class="ticker-sep">•</span>';
+        }
+      });
+
+      ticker.innerHTML = html;
+    })
+    .catch(function () {});
+}
+
+// Override switchMobileTab to load news data
+var _origSwitchMobileTab = window.switchMobileTab;
+window.switchMobileTab = function (tabName, btn) {
+  if (_origSwitchMobileTab) _origSwitchMobileTab(tabName, btn);
+
+  if (tabName === 'news') {
+    loadNewsTicker();
+    loadNewsStats();
+    loadNewsFeed();
+  } else if (tabName === 'orders') {
+    setTimeout(loadMobilePositions, 200);
+  }
+};
+  </script>
+</body>
+</html>

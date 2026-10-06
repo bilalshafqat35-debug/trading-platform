@@ -1,0 +1,119 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Invite Friends</title>
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+
+  <div class="toast-container" id="toastContainer">
+    {% for m in messages %}
+      <div class="toast {{ m.tags }}">
+        <span class="toast-icon">
+          {% if 'success' in m.tags %}✓{% elif 'error' in m.tags %}✕{% else %}ℹ{% endif %}
+        </span>
+        <span class="toast-text">{{ m }}</span>
+        <button class="toast-close" onclick="closeToast(this.parentElement)">×</button>
+      </div>
+    {% endfor %}
+  </div>
+
+  <div class="history-wrap">
+
+    <div class="history-header">
+      <h2>Invite Friends</h2>
+      <a href="{% url 'dashboard' %}" class="back-btn">← Back to Dashboard</a>
+    </div>
+
+    <div class="invite-card">
+      <div class="invite-icon">🎁</div>
+      <h3 class="invite-title">Your Referral Link</h3>
+      <p class="invite-desc">
+        Share this link with friends. When they register, you'll be credited as their referrer.
+      </p>
+
+      <div class="referral-link-box">
+        <input type="text" id="referralLink" value="{{ referral_link }}" readonly>
+        <button type="button" onclick="copyReferral()" class="copy-btn">📋 Copy</button>
+      </div>
+
+      <div class="share-buttons">
+        <a href="https://wa.me/?text=Join%20this%20trading%20platform%3A%20{{ referral_link|urlencode }}"
+           target="_blank" rel="noopener" class="share-btn whatsapp">
+          💬 WhatsApp
+        </a>
+        <a href="https://t.me/share/url?url={{ referral_link|urlencode }}&text=Join%20this%20trading%20platform"
+           target="_blank" rel="noopener" class="share-btn telegram">
+          ✈️ Telegram
+        </a>
+      </div>
+    </div>
+
+    <div class="referrals-section">
+      <h3>Your Referrals ({{ referrals|length }})</h3>
+
+      {% if referrals %}
+        <div class="history-card">
+          <table>
+            <thead>
+              <tr>
+                <th>Username</th>
+                <th>Email</th>
+                <th>Joined</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in referrals %}
+                <tr>
+                  <td>{{ r.username }}</td>
+                  <td>{{ r.email|default:"—" }}</td>
+                  <td>{{ r.date_joined|date:"d M Y, H:i" }}</td>
+                  <td>
+                    {% if r.is_active %}
+                      <span class="status-active">✅ Active</span>
+                    {% else %}
+                      <span class="status-pending">⏳ Pending</span>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="empty-state">
+          <p>You haven't referred anyone yet.</p>
+          <p class="hint">Share your link to get started!</p>
+        </div>
+      {% endif %}
+    </div>
+
+  </div>
+
+  <script>
+    function copyReferral() {
+      var input = document.getElementById('referralLink');
+      input.select();
+      input.setSelectionRange(0, 99999);
+      try {
+        document.execCommand('copy');
+        var btn = document.querySelector('.copy-btn');
+        var original = btn.textContent;
+        btn.textContent = '✓ Copied!';
+        btn.classList.add('copied');
+        setTimeout(function () {
+          btn.textContent = original;
+          btn.classList.remove('copied');
+        }, 2000);
+      } catch (e) {
+        alert('Copy failed. Please copy manually.');
+      }
+    }
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,107 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Profile</title>
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+
+  <div class="toast-container" id="toastContainer">
+    {% for m in messages %}
+      <div class="toast {{ m.tags }}">
+        <span class="toast-icon">
+          {% if 'success' in m.tags %}✓{% elif 'error' in m.tags %}✕{% else %}ℹ{% endif %}
+        </span>
+        <span class="toast-text">{{ m }}</span>
+        <button class="toast-close" onclick="closeToast(this.parentElement)">×</button>
+      </div>
+    {% endfor %}
+  </div>
+
+  <div class="history-wrap">
+
+    <div class="history-header">
+      <h2>My Profile</h2>
+      <a href="{% url 'dashboard' %}" class="back-btn">← Back to Dashboard</a>
+    </div>
+
+    <div class="profile-grid">
+
+      <div class="profile-side">
+        <div class="profile-avatar">
+          {{ user.username|first|upper }}
+        </div>
+        <h3 class="profile-username">{{ user.username }}</h3>
+        <p class="profile-joined">Joined {{ user.date_joined|date:"d M Y" }}</p>
+
+        <div class="profile-stat">
+          <span class="label">Balance</span>
+          <span class="value">${{ account.balance|floatformat:2 }}</span>
+        </div>
+        <div class="profile-stat">
+          <span class="label">Total Trades</span>
+          <span class="value">{{ total_trades }}</span>
+        </div>
+        <div class="profile-stat">
+          <span class="label">Deposits</span>
+          <span class="value">{{ total_deposits }}</span>
+        </div>
+        <div class="profile-stat">
+          <span class="label">Total Deposited</span>
+          <span class="value">${{ total_deposited|floatformat:2 }}</span>
+        </div>
+      </div>
+
+      <div class="profile-main">
+        <h3>Edit Information</h3>
+
+        <form method="post" class="profile-form">
+          {% csrf_token %}
+
+          <div class="profile-field">
+            <label>Username</label>
+            <input type="text" value="{{ user.username }}" disabled>
+            <small>Username cannot be changed.</small>
+          </div>
+
+          <div class="profile-field">
+            <label for="id_first_name">First Name</label>
+            {{ form.first_name }}
+          </div>
+
+          <div class="profile-field">
+            <label for="id_last_name">Last Name</label>
+            {{ form.last_name }}
+          </div>
+
+          <div class="profile-field">
+            <label for="id_email">Email</label>
+            {{ form.email }}
+            {% if form.email.errors %}
+              <ul class="field-errors">
+                {% for e in form.email.errors %}<li>{{ e }}</li>{% endfor %}
+              </ul>
+            {% endif %}
+          </div>
+
+          <button type="submit" class="profile-save">Save Changes</button>
+        </form>
+
+        <div class="profile-divider"></div>
+
+        <h3>Security</h3>
+        <p class="profile-note">
+          Want to change your password? Coming in the next update.
+        </p>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script src="{% static 'js/main.js' %}"></script>
+</body>
+</html>
