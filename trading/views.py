@@ -13,20 +13,27 @@ from django.core.paginator import Paginator
 from django.db.models import Sum
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
+from django.utils import timezone
 
 from .forms import RegisterForm, ProfileForm
-from .models import Account, Profile, Signal, ChartOverride
-
-from django.utils import timezone
 from .models import Account, Profile, Signal, ChartOverride, ContractPosition
 
 ASSETS = {
     "BTC": {"label": "Bitcoin", "type": "crypto", "binance": "BTCUSDT"},
     "ETH": {"label": "Ethereum", "type": "crypto", "binance": "ETHUSDT"},
     "SOL": {"label": "Solana", "type": "crypto", "binance": "SOLUSDT"},
+    "BNB": {"label": "BNB", "type": "crypto", "binance": "BNBUSDT"},
+    "XRP": {"label": "Ripple", "type": "crypto", "binance": "XRPUSDT"},
+    "ADA": {"label": "Cardano", "type": "crypto", "binance": "ADAUSDT"},
+    "DOGE": {"label": "Dogecoin", "type": "crypto", "binance": "DOGEUSDT"},
+    "DOT": {"label": "Polkadot", "type": "crypto", "binance": "DOTUSDT"},
+    "LINK": {"label": "Chainlink", "type": "crypto", "binance": "LINKUSDT"},
     "EURUSD": {"label": "EUR/USD", "type": "forex", "pair": "EUR/USD"},
     "GBPUSD": {"label": "GBP/USD", "type": "forex", "pair": "GBP/USD"},
     "USDJPY": {"label": "USD/JPY", "type": "forex", "pair": "USD/JPY"},
+    "AUDUSD": {"label": "AUD/USD", "type": "forex", "pair": "AUD/USD"},
+    "USDCAD": {"label": "USD/CAD", "type": "forex", "pair": "USD/CAD"},
+    "EURGBP": {"label": "EUR/GBP", "type": "forex", "pair": "EUR/GBP"},
 }
 
 
@@ -88,16 +95,28 @@ def get_avg_buy_price(account, symbol):
     return Decimal("0")
 
 
-def get_price(symbol):
-    """Real price — Binance, CoinGecko fallback, TwelveData for forex."""
+def get_price(symbol, force_refresh=False):
+    """Fetch price — Binance primary, CoinGecko fallback (crypto); TwelveData (forex).
+
+    force_refresh=True: Cache bypass karo aur fresh price fetch karo.
+    """
+    if symbol not in ASSETS:
+        return None
+
     asset = ASSETS[symbol]
     cache_key = f"price_{symbol}"
 
-    cached = cache.get(cache_key)
-    if cached is not None:
-        return Decimal(cached)
+    # Cache check (agar force_refresh nahi)
+    if not force_refresh:
+        cached = cache.get(cache_key)
+        if cached is not None:
+            try:
+                return Decimal(cached)
+            except Exception:
+                pass
 
     if asset["type"] == "crypto":
+        # Binance
         try:
             r = requests.get(
                 "https://api.binance.com/api/v3/ticker/price",
@@ -113,8 +132,13 @@ def get_price(symbol):
         except (requests.RequestException, KeyError, InvalidOperation, ValueError):
             pass
 
+        # CoinGecko fallback
         try:
-            cg_id = {"BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana"}.get(symbol)
+            cg_id = {
+                "BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana",
+                "BNB": "binancecoin", "XRP": "ripple", "ADA": "cardano",
+                "DOGE": "dogecoin", "DOT": "polkadot", "LINK": "chainlink",
+            }.get(symbol)
             if cg_id:
                 r = requests.get(
                     "https://api.coingecko.com/api/v3/simple/price",
@@ -132,6 +156,7 @@ def get_price(symbol):
 
         return None
 
+    # Forex
     try:
         r = requests.get(
             "https://api.twelvedata.com/price",
@@ -221,8 +246,9 @@ def trade(request):
         messages.error(request, "Invalid data. Please try again.")
         return redirect("dashboard")
 
-    # Trade HAMESHA real price par
-    price = get_price(symbol)
+    # Fresh price
+    cache.delete(f"price_{symbol}")
+    price = get_price(symbol, force_refresh=True)
     if price is None or price <= 0:
         messages.error(request, "Price unavailable. Please try again in a moment.")
         return redirect("dashboard")
@@ -272,7 +298,8 @@ def portfolio(request):
             continue
 
         avg_buy = get_avg_buy_price(account, symbol)
-        current_price = get_price(symbol) or Decimal("0")
+        # Fresh price for portfolio
+        current_price = get_price(symbol, force_refresh=True) or Decimal("0")
 
         invested = (qty * avg_buy).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
         current_value = (qty * current_price).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
@@ -333,7 +360,8 @@ def close_position(request, symbol):
         messages.error(request, "Quantity too small to close.")
         return redirect("portfolio")
 
-    current_price = get_price(symbol)
+    cache.delete(f"price_{symbol}")
+    current_price = get_price(symbol, force_refresh=True)
     if current_price is None or current_price <= 0:
         messages.error(request, "Price unavailable. Please try again.")
         return redirect("portfolio")
@@ -349,8 +377,6 @@ def close_position(request, symbol):
 
     messages.success(request, f"Closed {percent}% of {symbol}: +${amount} added to balance.")
     return redirect("portfolio")
-
-
 @login_required
 def trade_history(request):
     account = get_account(request.user)
@@ -553,7 +579,6 @@ def get_klines_api(request, symbol):
 
     override = get_active_override(symbol)
 
-    # Cache key — override status bhi include
     override_key = f"{override.direction}_{override.intensity_percent}" if override else "none"
     cache_key = f"klines_{symbol}_{override_key}"
 
@@ -563,7 +588,6 @@ def get_klines_api(request, symbol):
 
     candles = []
 
-    # Binance (5-min, 100)
     try:
         r = requests.get(
             "https://api.binance.com/api/v3/klines",
@@ -584,7 +608,6 @@ def get_klines_api(request, symbol):
     except (requests.RequestException, ValueError):
         pass
 
-    # CoinGecko OHLC fallback (hourly, 24h)
     if not candles:
         try:
             cg_id = {"BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana"}.get(symbol)
@@ -611,7 +634,6 @@ def get_klines_api(request, symbol):
     if not candles:
         return JsonResponse({"error": "Failed to fetch klines"}, status=503)
 
-    # Override offset
     if override:
         pct = float(override.intensity_percent) / 100.0
         factor = (1 + pct) if override.direction == "UP" else (1 - pct)
@@ -631,6 +653,464 @@ def get_klines_api(request, symbol):
 
     cache.set(cache_key, response_data, 120)
     return JsonResponse(response_data)
+
+
+@login_required
+def get_market_list_api(request):
+    """Market list — cached for 120 seconds."""
+    cache_key = "market_list_data"
+    cached = cache.get(cache_key)
+    if cached:
+        return JsonResponse(cached)
+
+    symbols = [
+        {"symbol": "BTC", "label": "Bitcoin", "type": "crypto", "binance": "BTCUSDT", "cg_id": "bitcoin",
+         "icon_img": "https://assets.coingecko.com/coins/images/1/small/bitcoin.png"},
+        {"symbol": "ETH", "label": "Ethereum", "type": "crypto", "binance": "ETHUSDT", "cg_id": "ethereum",
+         "icon_img": "https://assets.coingecko.com/coins/images/279/small/ethereum.png"},
+        {"symbol": "SOL", "label": "Solana", "type": "crypto", "binance": "SOLUSDT", "cg_id": "solana",
+         "icon_img": "https://assets.coingecko.com/coins/images/4128/small/solana.png"},
+        {"symbol": "BNB", "label": "BNB", "type": "crypto", "binance": "BNBUSDT", "cg_id": "binancecoin",
+         "icon_img": "https://assets.coingecko.com/coins/images/825/small/bnb-icon2_2x.png"},
+        {"symbol": "XRP", "label": "Ripple", "type": "crypto", "binance": "XRPUSDT", "cg_id": "ripple",
+         "icon_img": "https://assets.coingecko.com/coins/images/44/small/xrp-symbol-white-128.png"},
+        {"symbol": "ADA", "label": "Cardano", "type": "crypto", "binance": "ADAUSDT", "cg_id": "cardano",
+         "icon_img": "https://assets.coingecko.com/coins/images/975/small/cardano.png"},
+        {"symbol": "DOGE", "label": "Dogecoin", "type": "crypto", "binance": "DOGEUSDT", "cg_id": "dogecoin",
+         "icon_img": "https://assets.coingecko.com/coins/images/5/small/dogecoin.png"},
+        {"symbol": "DOT", "label": "Polkadot", "type": "crypto", "binance": "DOTUSDT", "cg_id": "polkadot",
+         "icon_img": "https://assets.coingecko.com/coins/images/12171/small/polkadot.png"},
+        {"symbol": "LINK", "label": "Chainlink", "type": "crypto", "binance": "LINKUSDT", "cg_id": "chainlink",
+         "icon_img": "https://assets.coingecko.com/coins/images/877/small/chainlink-new-logo.png"},
+        {"symbol": "EURUSD", "label": "EUR/USD", "type": "forex", "pair": "EUR/USD",
+         "icon_img": "https://flagcdn.com/w80/eu.png"},
+        {"symbol": "GBPUSD", "label": "GBP/USD", "type": "forex", "pair": "GBP/USD",
+         "icon_img": "https://flagcdn.com/w80/gb.png"},
+        {"symbol": "USDJPY", "label": "USD/JPY", "type": "forex", "pair": "USD/JPY",
+         "icon_img": "https://flagcdn.com/w80/jp.png"},
+        {"symbol": "AUDUSD", "label": "AUD/USD", "type": "forex", "pair": "AUD/USD",
+         "icon_img": "https://flagcdn.com/w80/au.png"},
+        {"symbol": "USDCAD", "label": "USD/CAD", "type": "forex", "pair": "USD/CAD",
+         "icon_img": "https://flagcdn.com/w80/ca.png"},
+        {"symbol": "EURGBP", "label": "EUR/GBP", "type": "forex", "pair": "EUR/GBP",
+         "icon_img": "https://flagcdn.com/w80/eu.png"},
+    ]
+
+    result = []
+
+    for s in symbols:
+        try:
+            current_price = get_price(s["symbol"])
+            if current_price is None:
+                continue
+
+            spark_cache_key = f"spark_{s['symbol']}"
+            spark = cache.get(spark_cache_key) or []
+
+            if not spark:
+                if s["type"] == "crypto":
+                    try:
+                        r = requests.get(
+                            "https://api.binance.com/api/v3/klines",
+                            params={"symbol": s["binance"], "interval": "1h", "limit": 24},
+                            timeout=5,
+                        )
+                        if r.status_code == 200:
+                            raw = r.json()
+                            spark = [float(k[4]) for k in raw]
+                    except Exception:
+                        pass
+
+                    if not spark and s.get("cg_id"):
+                        try:
+                            r = requests.get(
+                                f"https://api.coingecko.com/api/v3/coins/{s['cg_id']}/market_chart",
+                                params={"vs_currency": "usd", "days": 1},
+                                timeout=10,
+                            )
+                            if r.status_code == 200:
+                                prices = r.json().get("prices", [])
+                                step = max(1, len(prices) // 24)
+                                spark = [float(p[1]) for p in prices[::step]][:24]
+                        except Exception:
+                            pass
+                else:
+                    try:
+                        r = requests.get(
+                            "https://api.twelvedata.com/time_series",
+                            params={
+                                "symbol": s["pair"],
+                                "interval": "1h",
+                                "outputsize": 24,
+                                "apikey": settings.TWELVEDATA_API_KEY,
+                            },
+                            timeout=10,
+                        )
+                        if r.status_code == 200:
+                            values = r.json().get("values", [])
+                            spark = [float(v["close"]) for v in reversed(values)]
+                    except Exception:
+                        pass
+
+                if spark:
+                    cache.set(spark_cache_key, spark, 600)
+
+            if len(spark) >= 2:
+                first = spark[0]
+                last = spark[-1]
+                change_pct = ((last - first) / first * 100) if first > 0 else 0
+            else:
+                change_pct = 0
+
+            result.append({
+                "symbol": s["symbol"],
+                "label": s["label"],
+                "icon_img": s.get("icon_img", ""),
+                "price": str(current_price),
+                "change_pct": round(change_pct, 2),
+                "spark": spark,
+            })
+        except Exception:
+            continue
+
+    response_data = {"symbols": result}
+    cache.set(cache_key, response_data, 120)
+    return JsonResponse(response_data)
+
+
+# ============================================================
+# CONTRACT TRADING
+# ============================================================
+
+@login_required
+def contract_dashboard(request):
+    account = get_account(request.user)
+    open_positions = account.positions.filter(status="OPEN").order_by("-opened_at")
+
+    positions_data = []
+    total_pnl = Decimal("0")
+    total_margin = Decimal("0")
+
+    for p in open_positions:
+        # FRESH price for live P&L
+        current_price = get_price(p.symbol, force_refresh=True) or Decimal("0")
+
+        if current_price > 0:
+            if p.direction == "LONG":
+                pnl = ((current_price - p.entry_price) / p.entry_price) * p.position_size
+            else:
+                pnl = ((p.entry_price - current_price) / p.entry_price) * p.position_size
+            pnl = pnl.quantize(Decimal("0.01"), rounding=ROUND_DOWN)
+        else:
+            pnl = Decimal("0")
+
+        pnl_pct = (pnl / p.margin * 100) if p.margin > 0 else Decimal("0")
+
+        positions_data.append({
+            "id": p.id,
+            "symbol": p.symbol,
+            "direction": p.direction,
+            "leverage": p.leverage,
+            "margin": p.margin,
+            "position_size": p.position_size,
+            "entry_price": p.entry_price,
+            "current_price": current_price,
+            "pnl": pnl,
+            "pnl_pct": pnl_pct,
+            "is_profit": pnl >= 0,
+            "opened_at": p.opened_at,
+        })
+
+        total_pnl += pnl
+        total_margin += p.margin
+
+    context = {
+        "balance": account.balance,
+        "positions": positions_data,
+        "total_pnl": total_pnl,
+        "total_margin": total_margin,
+        "is_total_profit": total_pnl >= 0,
+        "assets": [(k, v["label"]) for k, v in ASSETS.items() if v["type"] == "crypto"],
+        "leverage_options": [1, 10, 50, 100],
+    }
+    return render(request, "trading/contract_dashboard.html", context)
+
+
+@login_required
+def open_position(request):
+    if request.method != "POST":
+        return redirect("contract_dashboard")
+
+    account = get_account(request.user)
+    symbol = request.POST.get("symbol")
+    direction = request.POST.get("direction")
+    leverage_str = request.POST.get("leverage", "1")
+
+    try:
+        margin = Decimal(request.POST.get("margin", "0"))
+    except InvalidOperation:
+        margin = Decimal("0")
+
+    try:
+        leverage = int(leverage_str)
+    except ValueError:
+        leverage = 1
+
+    if symbol not in ASSETS:
+        messages.error(request, "Invalid symbol.")
+        return redirect("contract_dashboard")
+
+    if direction not in ("LONG", "SHORT"):
+        messages.error(request, "Invalid direction.")
+        return redirect("contract_dashboard")
+
+    if leverage not in (1, 10, 50, 100):
+        messages.error(request, "Invalid leverage.")
+        return redirect("contract_dashboard")
+
+    if margin < Decimal("1"):
+        messages.error(request, "Minimum margin is $1.")
+        return redirect("contract_dashboard")
+
+    if margin > account.balance:
+        messages.error(request, "Insufficient balance. Please deposit funds first.")
+        return redirect("contract_dashboard")
+
+    # FRESH price
+    cache.delete(f"price_{symbol}")
+    price = get_price(symbol, force_refresh=True)
+    if price is None or price <= 0:
+        messages.error(request, "Price unavailable. Please try again.")
+        return redirect("contract_dashboard")
+
+    position_size = (margin * leverage).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
+
+    account.balance -= margin
+    account.save()
+
+    ContractPosition.objects.create(
+        account=account,
+        symbol=symbol,
+        direction=direction,
+        entry_price=price,
+        margin=margin,
+        leverage=leverage,
+        position_size=position_size,
+    )
+
+    messages.success(
+        request,
+        f"{direction} position opened: {symbol} {leverage}x, margin ${margin}"
+    )
+
+    referer = request.META.get('HTTP_REFERER', '')
+    if '/mobile/trade/' in referer:
+        success_msg = f"{direction} {symbol} {leverage}x opened at ${price}"
+        return redirect(f"/mobile/trade/{symbol}/?success=1&msg={success_msg}")
+
+    return redirect("contract_dashboard")
+
+
+@login_required
+def close_position_contract(request, position_id):
+    if request.method != "POST":
+        return redirect("contract_dashboard")
+
+    account = get_account(request.user)
+
+    try:
+        position = ContractPosition.objects.get(pk=position_id, account=account, status="OPEN")
+    except ContractPosition.DoesNotExist:
+        messages.error(request, "Position not found or already closed.")
+        return redirect("contract_dashboard")
+
+    # FRESH price
+    cache.delete(f"price_{position.symbol}")
+    current_price = get_price(position.symbol, force_refresh=True)
+    if current_price is None or current_price <= 0:
+        messages.error(request, "Price unavailable. Please try again.")
+        return redirect("contract_dashboard")
+
+    if position.direction == "LONG":
+        pnl = ((current_price - position.entry_price) / position.entry_price) * position.position_size
+    else:
+        pnl = ((position.entry_price - current_price) / position.entry_price) * position.position_size
+
+    pnl = pnl.quantize(Decimal("0.01"), rounding=ROUND_DOWN)
+
+    payout = position.margin + pnl
+    if payout < 0:
+        payout = Decimal("0")
+
+    account.balance += payout
+    account.save()
+
+    position.close_price = current_price
+    position.pnl = pnl
+    position.status = "CLOSED"
+    position.closed_at = timezone.now()
+    position.save()
+
+    if pnl >= 0:
+        messages.success(
+            request,
+            f"{position.direction} {position.symbol} closed: +${pnl} profit"
+        )
+    else:
+        messages.error(
+            request,
+            f"{position.direction} {position.symbol} closed: ${pnl} loss"
+        )
+
+    return redirect("contract_dashboard")
+
+
+@login_required
+def contract_history(request):
+    account = get_account(request.user)
+    closed_positions = account.positions.filter(status="CLOSED").order_by("-closed_at")
+
+    paginator = Paginator(closed_positions, 20)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    total_pnl = closed_positions.aggregate(s=Sum("pnl"))["s"] or Decimal("0")
+    total_count = closed_positions.count()
+    wins = closed_positions.filter(pnl__gte=0).count()
+    losses = closed_positions.filter(pnl__lt=0).count()
+
+    context = {
+        "page_obj": page_obj,
+        "total_count": total_count,
+        "total_pnl": total_pnl,
+        "wins": wins,
+        "losses": losses,
+        "is_total_profit": total_pnl >= 0,
+    }
+    return render(request, "trading/contract_history.html", context)
+
+
+# ============================================================
+# MOBILE APIs
+# ============================================================
+
+@login_required
+def mobile_trade(request, symbol):
+    if symbol not in ASSETS:
+        messages.error(request, "Invalid symbol.")
+        return redirect("dashboard")
+
+    account = get_account(request.user)
+    asset = ASSETS[symbol]
+
+    if asset["type"] == "crypto":
+        tv_symbol = f"BINANCE:{asset['binance']}"
+    else:
+        pair = asset["pair"].replace("/", "")
+        tv_symbol = f"FX:{pair}"
+
+    context = {
+        "symbol": symbol,
+        "label": asset["label"],
+        "type": asset["type"],
+        "tv_symbol": tv_symbol,
+        "balance": account.balance,
+        "leverage_options": [1, 10, 50, 100],
+    }
+    return render(request, "trading/mobile_trade.html", context)
+
+
+@login_required
+def get_mobile_positions_api(request):
+    """Mobile Orders tab — open contract positions + LIVE P&L."""
+    account = get_account(request.user)
+    positions = account.positions.filter(status="OPEN").order_by("-opened_at")
+
+    result = []
+    total_pnl = Decimal("0")
+    total_margin = Decimal("0")
+
+    for p in positions:
+        # FRESH price for live P&L
+        cache.delete(f"price_{p.symbol}")
+        current_price = get_price(p.symbol, force_refresh=True) or Decimal("0")
+
+        if current_price > 0:
+            if p.direction == "LONG":
+                pnl = ((current_price - p.entry_price) / p.entry_price) * p.position_size
+            else:
+                pnl = ((p.entry_price - current_price) / p.entry_price) * p.position_size
+            pnl = pnl.quantize(Decimal("0.01"), rounding=ROUND_DOWN)
+        else:
+            pnl = Decimal("0")
+
+        pnl_pct = (pnl / p.margin * 100) if p.margin > 0 else Decimal("0")
+
+        result.append({
+            "id": p.id,
+            "symbol": p.symbol,
+            "direction": p.direction,
+            "leverage": p.leverage,
+            "margin": str(p.margin),
+            "position_size": str(p.position_size),
+            "entry_price": str(p.entry_price),
+            "current_price": str(current_price),
+            "pnl": str(pnl),
+            "pnl_pct": str(round(pnl_pct, 2)),
+            "is_profit": pnl >= 0,
+            "opened_at": p.opened_at.strftime("%d %b, %H:%M"),
+        })
+
+        total_pnl += pnl
+        total_margin += p.margin
+
+    return JsonResponse({
+        "positions": result,
+        "count": len(result),
+        "total_pnl": str(total_pnl.quantize(Decimal("0.01"), rounding=ROUND_DOWN)),
+        "total_margin": str(total_margin.quantize(Decimal("0.01"), rounding=ROUND_DOWN)),
+        "is_profit": total_pnl >= 0,
+    })
+
+
+@login_required
+def get_mobile_history_api(request):
+    """Mobile Orders tab — closed contract positions."""
+    account = get_account(request.user)
+    closed = account.positions.filter(status="CLOSED").order_by("-closed_at")
+
+    total_count = closed.count()
+    wins = closed.filter(pnl__gte=0).count()
+    losses = closed.filter(pnl__lt=0).count()
+    total_pnl = closed.aggregate(s=Sum("pnl"))["s"] or Decimal("0")
+
+    closed = closed[:50]
+
+    result = []
+    for p in closed:
+        result.append({
+            "id": p.id,
+            "symbol": p.symbol,
+            "direction": p.direction,
+            "leverage": p.leverage,
+            "margin": str(p.margin),
+            "position_size": str(p.position_size),
+            "entry_price": str(p.entry_price),
+            "close_price": str(p.close_price) if p.close_price else "0",
+            "pnl": str(p.pnl) if p.pnl is not None else "0",
+            "is_profit": (p.pnl or Decimal("0")) >= 0,
+            "opened_at": p.opened_at.strftime("%d %b, %H:%M"),
+            "closed_at": p.closed_at.strftime("%d %b, %H:%M") if p.closed_at else "—",
+        })
+
+    return JsonResponse({
+        "history": result,
+        "total_count": total_count,
+        "wins": wins,
+        "losses": losses,
+        "total_pnl": str(total_pnl.quantize(Decimal("0.01"), rounding=ROUND_DOWN)),
+        "is_profit": total_pnl >= 0,
+    })
 
 
 # ============================================================
@@ -677,455 +1157,4 @@ def register(request):
 
     return render(request, "trading/register.html", {
         "form": form, "referrer": referrer, "ref_code": ref_code,
-    })
-# ============================================================
-# CONTRACT TRADING (Long/Short)
-# ============================================================
-
-@login_required
-def contract_dashboard(request):
-    """Contract trading page — Long/Short positions."""
-    account = get_account(request.user)
-
-    # Open positions
-    open_positions = account.positions.filter(status="OPEN").order_by("-opened_at")
-
-    # Har position ka live P&L calculate karo
-    positions_data = []
-    total_pnl = Decimal("0")
-    total_margin = Decimal("0")
-
-    for p in open_positions:
-        current_price = get_price(p.symbol) or Decimal("0")
-
-        if current_price > 0:
-            if p.direction == "LONG":
-                pnl = ((current_price - p.entry_price) / p.entry_price) * p.position_size
-            else:  # SHORT
-                pnl = ((p.entry_price - current_price) / p.entry_price) * p.position_size
-            pnl = pnl.quantize(Decimal("0.01"), rounding=ROUND_DOWN)
-        else:
-            pnl = Decimal("0")
-
-        pnl_pct = (pnl / p.margin * 100) if p.margin > 0 else Decimal("0")
-
-        positions_data.append({
-            "id": p.id,
-            "symbol": p.symbol,
-            "direction": p.direction,
-            "leverage": p.leverage,
-            "margin": p.margin,
-            "position_size": p.position_size,
-            "entry_price": p.entry_price,
-            "current_price": current_price,
-            "pnl": pnl,
-            "pnl_pct": pnl_pct,
-            "is_profit": pnl >= 0,
-            "opened_at": p.opened_at,
-        })
-
-        total_pnl += pnl
-        total_margin += p.margin
-
-    context = {
-        "balance": account.balance,
-        "positions": positions_data,
-        "total_pnl": total_pnl,
-        "total_margin": total_margin,
-        "is_total_profit": total_pnl >= 0,
-        "assets": [(k, v["label"]) for k, v in ASSETS.items() if v["type"] == "crypto"],
-        "leverage_options": [1, 10, 50, 100],
-    }
-    return render(request, "trading/contract_dashboard.html", context)
-
-
-@login_required
-def open_position(request):
-    """Naya Long/Short position open karo."""
-    if request.method != "POST":
-        return redirect("contract_dashboard")
-
-    account = get_account(request.user)
-    symbol = request.POST.get("symbol")
-    direction = request.POST.get("direction")
-    leverage_str = request.POST.get("leverage", "1")
-
-    try:
-        margin = Decimal(request.POST.get("margin", "0"))
-    except InvalidOperation:
-        margin = Decimal("0")
-
-    try:
-        leverage = int(leverage_str)
-    except ValueError:
-        leverage = 1
-
-    # Validations
-    if symbol not in ASSETS:
-        messages.error(request, "Invalid symbol.")
-        return redirect("contract_dashboard")
-
-    if direction not in ("LONG", "SHORT"):
-        messages.error(request, "Invalid direction.")
-        return redirect("contract_dashboard")
-
-    if leverage not in (1, 10, 50, 100):
-        messages.error(request, "Invalid leverage.")
-        return redirect("contract_dashboard")
-
-    if margin < Decimal("1"):
-        messages.error(request, "Minimum margin is $1.")
-        return redirect("contract_dashboard")
-
-    if margin > account.balance:
-        messages.error(request, "Insufficient balance. Please deposit funds first.")
-        return redirect("contract_dashboard")
-
-    # Current price
-    price = get_price(symbol)
-    if price is None or price <= 0:
-        messages.error(request, "Price unavailable. Please try again.")
-        return redirect("contract_dashboard")
-
-    # Position size = margin × leverage
-    position_size = (margin * leverage).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
-
-    # Balance se margin minus karo
-    account.balance -= margin
-    account.save()
-
-    # Position banao
-        # Position banao
-    ContractPosition.objects.create(
-        account=account,
-        symbol=symbol,
-        direction=direction,
-        entry_price=price,
-        margin=margin,
-        leverage=leverage,
-        position_size=position_size,
-    )
-
-    messages.success(
-        request,
-        f"{direction} position opened: {symbol} {leverage}x, margin ${margin}"
-    )
-
-    # Redirect — agar mobile trade page se aaya to wapas wahi bhejo
-    referer = request.META.get('HTTP_REFERER', '')
-    if '/mobile/trade/' in referer:
-        success_msg = f"{direction} {symbol} {leverage}x opened at ${price}"
-        return redirect(f"/mobile/trade/{symbol}/?success=1&msg={success_msg}")
-
-    return redirect("contract_dashboard")
-
-
-@login_required
-def close_position_contract(request, position_id):
-    """Position close karo aur P&L balance mein add karo."""
-    if request.method != "POST":
-        return redirect("contract_dashboard")
-
-    account = get_account(request.user)
-
-    try:
-        position = ContractPosition.objects.get(pk=position_id, account=account, status="OPEN")
-    except ContractPosition.DoesNotExist:
-        messages.error(request, "Position not found or already closed.")
-        return redirect("contract_dashboard")
-
-    # Current price
-    current_price = get_price(position.symbol)
-    if current_price is None or current_price <= 0:
-        messages.error(request, "Price unavailable. Please try again.")
-        return redirect("contract_dashboard")
-
-    # P&L calculate
-    if position.direction == "LONG":
-        pnl = ((current_price - position.entry_price) / position.entry_price) * position.position_size
-    else:  # SHORT
-        pnl = ((position.entry_price - current_price) / position.entry_price) * position.position_size
-
-    pnl = pnl.quantize(Decimal("0.01"), rounding=ROUND_DOWN)
-
-    # Balance = margin + pnl
-    # (Margin already account se minus ho chuka tha jab open hua tha)
-    payout = position.margin + pnl
-    if payout < 0:
-        payout = Decimal("0")  # Loss se zyada nahi ja sakta
-
-    account.balance += payout
-    account.save()
-
-    # Position update karo
-    position.close_price = current_price
-    position.pnl = pnl
-    position.status = "CLOSED"
-    position.closed_at = timezone.now()
-    position.save()
-
-    if pnl >= 0:
-        messages.success(
-            request,
-            f"{position.direction} {position.symbol} closed: +${pnl} profit"
-        )
-    else:
-        messages.error(
-            request,
-            f"{position.direction} {position.symbol} closed: ${pnl} loss"
-        )
-
-    return redirect("contract_dashboard")
-
-
-@login_required
-def contract_history(request):
-    """Closed positions history."""
-    account = get_account(request.user)
-    closed_positions = account.positions.filter(status="CLOSED").order_by("-closed_at")
-
-    paginator = Paginator(closed_positions, 20)
-    page_number = request.GET.get("page")
-    page_obj = paginator.get_page(page_number)
-
-    # Summary
-    total_pnl = closed_positions.aggregate(s=Sum("pnl"))["s"] or Decimal("0")
-    total_count = closed_positions.count()
-    wins = closed_positions.filter(pnl__gte=0).count()
-    losses = closed_positions.filter(pnl__lt=0).count()
-
-    context = {
-        "page_obj": page_obj,
-        "total_count": total_count,
-        "total_pnl": total_pnl,
-        "wins": wins,
-        "losses": losses,
-        "is_total_profit": total_pnl >= 0,
-    }
-    return render(request, "trading/contract_history.html", context)
-@login_required
-@login_required
-@login_required
-def get_market_list_api(request):
-    """Market list — cached for 120 seconds to avoid rate limits."""
-    cache_key = "market_list_data"
-    cached = cache.get(cache_key)
-    if cached:
-        return JsonResponse(cached)
-
-    symbols = [
-        {"symbol": "BTC", "label": "Bitcoin", "type": "crypto", "binance": "BTCUSDT", "cg_id": "bitcoin",
-         "icon_img": "https://assets.coingecko.com/coins/images/1/small/bitcoin.png"},
-        {"symbol": "ETH", "label": "Ethereum", "type": "crypto", "binance": "ETHUSDT", "cg_id": "ethereum",
-         "icon_img": "https://assets.coingecko.com/coins/images/279/small/ethereum.png"},
-        {"symbol": "SOL", "label": "Solana", "type": "crypto", "binance": "SOLUSDT", "cg_id": "solana",
-         "icon_img": "https://assets.coingecko.com/coins/images/4128/small/solana.png"},
-        {"symbol": "EURUSD", "label": "EUR/USD", "type": "forex", "pair": "EUR/USD",
-         "icon_img": "https://flagcdn.com/w80/eu.png"},
-        {"symbol": "GBPUSD", "label": "GBP/USD", "type": "forex", "pair": "GBP/USD",
-         "icon_img": "https://flagcdn.com/w80/gb.png"},
-        {"symbol": "USDJPY", "label": "USD/JPY", "type": "forex", "pair": "USD/JPY",
-         "icon_img": "https://flagcdn.com/w80/jp.png"},
-    ]
-
-    result = []
-
-    for s in symbols:
-        try:
-            current_price = get_price(s["symbol"])
-            if current_price is None:
-                continue
-
-            # Sparkline data
-            spark_cache_key = f"spark_{s['symbol']}"
-            spark = cache.get(spark_cache_key) or []
-
-            if not spark:
-                if s["type"] == "crypto":
-                    # Binance 1h klines
-                    try:
-                        r = requests.get(
-                            "https://api.binance.com/api/v3/klines",
-                            params={"symbol": s["binance"], "interval": "1h", "limit": 24},
-                            timeout=5,
-                        )
-                        if r.status_code == 200:
-                            raw = r.json()
-                            spark = [float(k[4]) for k in raw]
-                    except Exception:
-                        pass
-
-                    # CoinGecko fallback
-                    if not spark and s.get("cg_id"):
-                        try:
-                            r = requests.get(
-                                f"https://api.coingecko.com/api/v3/coins/{s['cg_id']}/market_chart",
-                                params={"vs_currency": "usd", "days": 1},
-                                timeout=10,
-                            )
-                            if r.status_code == 200:
-                                prices = r.json().get("prices", [])
-                                step = max(1, len(prices) // 24)
-                                spark = [float(p[1]) for p in prices[::step]][:24]
-                        except Exception:
-                            pass
-                else:
-                    # Forex
-                    try:
-                        r = requests.get(
-                            "https://api.twelvedata.com/time_series",
-                            params={
-                                "symbol": s["pair"],
-                                "interval": "1h",
-                                "outputsize": 24,
-                                "apikey": settings.TWELVEDATA_API_KEY,
-                            },
-                            timeout=10,
-                        )
-                        if r.status_code == 200:
-                            values = r.json().get("values", [])
-                            spark = [float(v["close"]) for v in reversed(values)]
-                    except Exception:
-                        pass
-
-                if spark:
-                    cache.set(spark_cache_key, spark, 600)  # 10 min cache
-
-            # Change %
-            if len(spark) >= 2:
-                first = spark[0]
-                last = spark[-1]
-                change_pct = ((last - first) / first * 100) if first > 0 else 0
-            else:
-                change_pct = 0
-
-            result.append({
-                "symbol": s["symbol"],
-                "label": s["label"],
-                "icon_img": s.get("icon_img", ""),
-                "price": str(current_price),
-                "change_pct": round(change_pct, 2),
-                "spark": spark,
-            })
-        except Exception:
-            continue
-
-    response_data = {"symbols": result}
-    cache.set(cache_key, response_data, 120)  # 2 min cache
-    return JsonResponse(response_data)
-@login_required
-def mobile_trade(request, symbol):
-    """Mobile trade page — specific symbol ka Long/Short UI."""
-    if symbol not in ASSETS:
-        messages.error(request, "Invalid symbol.")
-        return redirect("dashboard")
-
-    account = get_account(request.user)
-    asset = ASSETS[symbol]
-
-    # Symbol ka TradingView symbol name
-    if asset["type"] == "crypto":
-        tv_symbol = f"BINANCE:{asset['binance']}"
-    else:
-        # Forex — OANDA ya FX
-        pair = asset["pair"].replace("/", "")
-        tv_symbol = f"FX:{pair}"
-
-    context = {
-        "symbol": symbol,
-        "label": asset["label"],
-        "type": asset["type"],
-        "tv_symbol": tv_symbol,
-        "balance": account.balance,
-        "leverage_options": [1, 10, 50, 100],
-    }
-    return render(request, "trading/mobile_trade.html", context)
-@login_required
-def get_mobile_positions_api(request):
-    """Mobile Orders tab ke liye — open contract positions + live P&L."""
-    account = get_account(request.user)
-    positions = account.positions.filter(status="OPEN").order_by("-opened_at")
-
-    result = []
-    total_pnl = Decimal("0")
-    total_margin = Decimal("0")
-
-    for p in positions:
-        current_price = get_price(p.symbol) or Decimal("0")
-
-        if current_price > 0:
-            if p.direction == "LONG":
-                pnl = ((current_price - p.entry_price) / p.entry_price) * p.position_size
-            else:
-                pnl = ((p.entry_price - current_price) / p.entry_price) * p.position_size
-            pnl = pnl.quantize(Decimal("0.01"), rounding=ROUND_DOWN)
-        else:
-            pnl = Decimal("0")
-
-        pnl_pct = (pnl / p.margin * 100) if p.margin > 0 else Decimal("0")
-
-        result.append({
-            "id": p.id,
-            "symbol": p.symbol,
-            "direction": p.direction,
-            "leverage": p.leverage,
-            "margin": str(p.margin),
-            "position_size": str(p.position_size),
-            "entry_price": str(p.entry_price),
-            "current_price": str(current_price),
-            "pnl": str(pnl),
-            "pnl_pct": str(round(pnl_pct, 2)),
-            "is_profit": pnl >= 0,
-            "opened_at": p.opened_at.strftime("%d %b, %H:%M"),
-        })
-
-        total_pnl += pnl
-        total_margin += p.margin
-
-    return JsonResponse({
-        "positions": result,
-        "count": len(result),
-        "total_pnl": str(total_pnl.quantize(Decimal("0.01"), rounding=ROUND_DOWN)),
-        "total_margin": str(total_margin.quantize(Decimal("0.01"), rounding=ROUND_DOWN)),
-        "is_profit": total_pnl >= 0,
-    })
-@login_required
-def get_mobile_history_api(request):
-    """Mobile Orders tab — closed contract positions."""
-    account = get_account(request.user)
-    closed = account.positions.filter(status="CLOSED").order_by("-closed_at")
-
-    # Summary
-    total_count = closed.count()
-    wins = closed.filter(pnl__gte=0).count()
-    losses = closed.filter(pnl__lt=0).count()
-    total_pnl = closed.aggregate(s=Sum("pnl"))["s"] or Decimal("0")
-
-    # Latest 50 only
-    closed = closed[:50]
-
-    result = []
-    for p in closed:
-        result.append({
-            "id": p.id,
-            "symbol": p.symbol,
-            "direction": p.direction,
-            "leverage": p.leverage,
-            "margin": str(p.margin),
-            "position_size": str(p.position_size),
-            "entry_price": str(p.entry_price),
-            "close_price": str(p.close_price) if p.close_price else "0",
-            "pnl": str(p.pnl) if p.pnl is not None else "0",
-            "is_profit": (p.pnl or Decimal("0")) >= 0,
-            "opened_at": p.opened_at.strftime("%d %b, %H:%M"),
-            "closed_at": p.closed_at.strftime("%d %b, %H:%M") if p.closed_at else "—",
-        })
-
-    return JsonResponse({
-        "history": result,
-        "total_count": total_count,
-        "wins": wins,
-        "losses": losses,
-        "total_pnl": str(total_pnl.quantize(Decimal("0.01"), rounding=ROUND_DOWN)),
-        "is_profit": total_pnl >= 0,
     })

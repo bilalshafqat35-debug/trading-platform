@@ -1687,3 +1687,43 @@ h3 {
     z-index: 10;
   }
 }
+/* ============================================================ */
+/* AUTH PAGES MOBILE FIX                                        */
+/* ============================================================ */
+@media (max-width: 768px) {
+  .auth-wrapper {
+    padding: 16px;
+    min-height: 100vh;
+  }
+  .auth-card {
+    width: 100% !important;
+    max-width: 380px !important;
+    padding: 28px 22px !important;
+    margin: 0 auto;
+  }
+  .auth-card h2 {
+    font-size: 22px !important;
+    margin-bottom: 18px !important;
+  }
+  .auth-card label {
+    font-size: 12px !important;
+    margin-top: 12px !important;
+  }
+  .auth-card input {
+    padding: 12px 14px !important;
+    font-size: 15px !important;
+  }
+  .auth-card button {
+    padding: 13px !important;
+    font-size: 15px !important;
+    margin-top: 18px !important;
+  }
+  .auth-link {
+    font-size: 13px !important;
+    margin-top: 14px !important;
+  }
+  .auth-error {
+    font-size: 12px !important;
+    padding: 9px 11px !important;
+  }
+}
