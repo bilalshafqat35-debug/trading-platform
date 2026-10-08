@@ -1880,19 +1880,6 @@ h3 {
     max-height: 260px !important;
     max-width: 100% !important;
   }
-  .trade-chart-inner::after {
-    content: "";
-    position: absolute;
-    left: 0;
-    bottom: 30px;
-    width: 70px;
-    height: 70px;
-    background: #ffffff;
-    pointer-events: none;
-    z-index: 10;
-    border-radius: 0 8px 0 0;
-  }
-
   .trade-controls {
     padding: 18px 16px 20px !important;
     background: rgba(15, 20, 41, 0.98) !important;
