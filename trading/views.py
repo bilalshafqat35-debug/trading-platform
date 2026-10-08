@@ -28,12 +28,55 @@ ASSETS = {
     "DOGE": {"label": "Dogecoin", "type": "crypto", "binance": "DOGEUSDT"},
     "DOT": {"label": "Polkadot", "type": "crypto", "binance": "DOTUSDT"},
     "LINK": {"label": "Chainlink", "type": "crypto", "binance": "LINKUSDT"},
+    "MATIC": {"label": "Polygon", "type": "crypto", "binance": "MATICUSDT"},
+    "AVAX": {"label": "Avalanche", "type": "crypto", "binance": "AVAXUSDT"},
+    "SHIB": {"label": "Shiba Inu", "type": "crypto", "binance": "SHIBUSDT"},
+    "LTC": {"label": "Litecoin", "type": "crypto", "binance": "LTCUSDT"},
+    "TRX": {"label": "Tron", "type": "crypto", "binance": "TRXUSDT"},
+    "ATOM": {"label": "Cosmos", "type": "crypto", "binance": "ATOMUSDT"},
+    "UNI": {"label": "Uniswap", "type": "crypto", "binance": "UNIUSDT"},
     "EURUSD": {"label": "EUR/USD", "type": "forex", "pair": "EUR/USD"},
     "GBPUSD": {"label": "GBP/USD", "type": "forex", "pair": "GBP/USD"},
     "USDJPY": {"label": "USD/JPY", "type": "forex", "pair": "USD/JPY"},
     "AUDUSD": {"label": "AUD/USD", "type": "forex", "pair": "AUD/USD"},
     "USDCAD": {"label": "USD/CAD", "type": "forex", "pair": "USD/CAD"},
     "EURGBP": {"label": "EUR/GBP", "type": "forex", "pair": "EUR/GBP"},
+}
+
+# CoinGecko IDs for crypto
+CG_IDS = {
+    "BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana",
+    "BNB": "binancecoin", "XRP": "ripple", "ADA": "cardano",
+    "DOGE": "dogecoin", "DOT": "polkadot", "LINK": "chainlink",
+    "MATIC": "matic-network", "AVAX": "avalanche-2",
+    "SHIB": "shiba-inu", "LTC": "litecoin", "TRX": "tron",
+    "ATOM": "cosmos", "UNI": "uniswap",
+}
+
+# Coin icons
+COIN_ICONS = {
+    "BTC": "https://assets.coingecko.com/coins/images/1/small/bitcoin.png",
+    "ETH": "https://assets.coingecko.com/coins/images/279/small/ethereum.png",
+    "SOL": "https://assets.coingecko.com/coins/images/4128/small/solana.png",
+    "BNB": "https://assets.coingecko.com/coins/images/825/small/bnb-icon2_2x.png",
+    "XRP": "https://assets.coingecko.com/coins/images/44/small/xrp-symbol-white-128.png",
+    "ADA": "https://assets.coingecko.com/coins/images/975/small/cardano.png",
+    "DOGE": "https://assets.coingecko.com/coins/images/5/small/dogecoin.png",
+    "DOT": "https://assets.coingecko.com/coins/images/12171/small/polkadot.png",
+    "LINK": "https://assets.coingecko.com/coins/images/877/small/chainlink-new-logo.png",
+    "MATIC": "https://assets.coingecko.com/coins/images/4713/small/polygon.png",
+    "AVAX": "https://assets.coingecko.com/coins/images/12559/small/Avalanche_Circle_RedWhite_Trans.png",
+    "SHIB": "https://assets.coingecko.com/coins/images/11939/small/shiba.png",
+    "LTC": "https://assets.coingecko.com/coins/images/2/small/litecoin.png",
+    "TRX": "https://assets.coingecko.com/coins/images/1094/small/tron-logo.png",
+    "ATOM": "https://assets.coingecko.com/coins/images/1481/small/cosmos_hub.png",
+    "UNI": "https://assets.coingecko.com/coins/images/12504/small/uniswap-uni.png",
+    "EURUSD": "https://flagcdn.com/w80/eu.png",
+    "GBPUSD": "https://flagcdn.com/w80/gb.png",
+    "USDJPY": "https://flagcdn.com/w80/jp.png",
+    "AUDUSD": "https://flagcdn.com/w80/au.png",
+    "USDCAD": "https://flagcdn.com/w80/ca.png",
+    "EURGBP": "https://flagcdn.com/w80/eu.png",
 }
 
 
@@ -134,11 +177,7 @@ def get_price(symbol, force_refresh=False):
 
         # CoinGecko fallback
         try:
-            cg_id = {
-                "BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana",
-                "BNB": "binancecoin", "XRP": "ripple", "ADA": "cardano",
-                "DOGE": "dogecoin", "DOT": "polkadot", "LINK": "chainlink",
-            }.get(symbol)
+            cg_id = CG_IDS.get(symbol)
             if cg_id:
                 r = requests.get(
                     "https://api.coingecko.com/api/v3/simple/price",
@@ -205,8 +244,6 @@ def get_display_price(symbol):
         "real_price": real_price, "display_price": real_price,
         "override_active": False, "direction": None, "intensity": None,
     }
-
-
 # ============================================================
 # PAGES
 # ============================================================
@@ -298,7 +335,6 @@ def portfolio(request):
             continue
 
         avg_buy = get_avg_buy_price(account, symbol)
-        # Fresh price for portfolio
         current_price = get_price(symbol, force_refresh=True) or Decimal("0")
 
         invested = (qty * avg_buy).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
@@ -377,6 +413,8 @@ def close_position(request, symbol):
 
     messages.success(request, f"Closed {percent}% of {symbol}: +${amount} added to balance.")
     return redirect("portfolio")
+
+
 @login_required
 def trade_history(request):
     account = get_account(request.user)
@@ -505,8 +543,6 @@ def invite_friends(request):
         "referrals": referrals,
     }
     return render(request, "trading/invite_friends.html", context)
-
-
 # ============================================================
 # API ENDPOINTS
 # ============================================================
@@ -578,7 +614,6 @@ def get_klines_api(request, symbol):
         return JsonResponse({"error": "Klines only available for crypto"}, status=400)
 
     override = get_active_override(symbol)
-
     override_key = f"{override.direction}_{override.intensity_percent}" if override else "none"
     cache_key = f"klines_{symbol}_{override_key}"
 
@@ -588,6 +623,7 @@ def get_klines_api(request, symbol):
 
     candles = []
 
+    # Attempt 1: Binance
     try:
         r = requests.get(
             "https://api.binance.com/api/v3/klines",
@@ -608,10 +644,11 @@ def get_klines_api(request, symbol):
     except (requests.RequestException, ValueError):
         pass
 
+    # Attempt 2: CoinGecko fallback
     if not candles:
-        try:
-            cg_id = {"BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana"}.get(symbol)
-            if cg_id:
+        cg_id = CG_IDS.get(symbol)
+        if cg_id:
+            try:
                 r = requests.get(
                     f"https://api.coingecko.com/api/v3/coins/{cg_id}/ohlc",
                     params={"vs_currency": "usd", "days": 1},
@@ -628,12 +665,13 @@ def get_klines_api(request, symbol):
                             })
                         except (IndexError, ValueError):
                             continue
-        except (requests.RequestException, ValueError):
-            pass
+            except (requests.RequestException, ValueError):
+                pass
 
     if not candles:
         return JsonResponse({"error": "Failed to fetch klines"}, status=503)
 
+    # Apply override offset
     if override:
         pct = float(override.intensity_percent) / 100.0
         factor = (1 + pct) if override.direction == "UP" else (1 - pct)
@@ -657,62 +695,30 @@ def get_klines_api(request, symbol):
 
 @login_required
 def get_market_list_api(request):
-    """Market list — cached for 120 seconds."""
+    """Market list — 22 symbols with sparklines. Cached 120 seconds."""
     cache_key = "market_list_data"
     cached = cache.get(cache_key)
     if cached:
         return JsonResponse(cached)
 
-    symbols = [
-        {"symbol": "BTC", "label": "Bitcoin", "type": "crypto", "binance": "BTCUSDT", "cg_id": "bitcoin",
-         "icon_img": "https://assets.coingecko.com/coins/images/1/small/bitcoin.png"},
-        {"symbol": "ETH", "label": "Ethereum", "type": "crypto", "binance": "ETHUSDT", "cg_id": "ethereum",
-         "icon_img": "https://assets.coingecko.com/coins/images/279/small/ethereum.png"},
-        {"symbol": "SOL", "label": "Solana", "type": "crypto", "binance": "SOLUSDT", "cg_id": "solana",
-         "icon_img": "https://assets.coingecko.com/coins/images/4128/small/solana.png"},
-        {"symbol": "BNB", "label": "BNB", "type": "crypto", "binance": "BNBUSDT", "cg_id": "binancecoin",
-         "icon_img": "https://assets.coingecko.com/coins/images/825/small/bnb-icon2_2x.png"},
-        {"symbol": "XRP", "label": "Ripple", "type": "crypto", "binance": "XRPUSDT", "cg_id": "ripple",
-         "icon_img": "https://assets.coingecko.com/coins/images/44/small/xrp-symbol-white-128.png"},
-        {"symbol": "ADA", "label": "Cardano", "type": "crypto", "binance": "ADAUSDT", "cg_id": "cardano",
-         "icon_img": "https://assets.coingecko.com/coins/images/975/small/cardano.png"},
-        {"symbol": "DOGE", "label": "Dogecoin", "type": "crypto", "binance": "DOGEUSDT", "cg_id": "dogecoin",
-         "icon_img": "https://assets.coingecko.com/coins/images/5/small/dogecoin.png"},
-        {"symbol": "DOT", "label": "Polkadot", "type": "crypto", "binance": "DOTUSDT", "cg_id": "polkadot",
-         "icon_img": "https://assets.coingecko.com/coins/images/12171/small/polkadot.png"},
-        {"symbol": "LINK", "label": "Chainlink", "type": "crypto", "binance": "LINKUSDT", "cg_id": "chainlink",
-         "icon_img": "https://assets.coingecko.com/coins/images/877/small/chainlink-new-logo.png"},
-        {"symbol": "EURUSD", "label": "EUR/USD", "type": "forex", "pair": "EUR/USD",
-         "icon_img": "https://flagcdn.com/w80/eu.png"},
-        {"symbol": "GBPUSD", "label": "GBP/USD", "type": "forex", "pair": "GBP/USD",
-         "icon_img": "https://flagcdn.com/w80/gb.png"},
-        {"symbol": "USDJPY", "label": "USD/JPY", "type": "forex", "pair": "USD/JPY",
-         "icon_img": "https://flagcdn.com/w80/jp.png"},
-        {"symbol": "AUDUSD", "label": "AUD/USD", "type": "forex", "pair": "AUD/USD",
-         "icon_img": "https://flagcdn.com/w80/au.png"},
-        {"symbol": "USDCAD", "label": "USD/CAD", "type": "forex", "pair": "USD/CAD",
-         "icon_img": "https://flagcdn.com/w80/ca.png"},
-        {"symbol": "EURGBP", "label": "EUR/GBP", "type": "forex", "pair": "EUR/GBP",
-         "icon_img": "https://flagcdn.com/w80/eu.png"},
-    ]
-
     result = []
 
-    for s in symbols:
+    for symbol, asset in ASSETS.items():
         try:
-            current_price = get_price(s["symbol"])
+            current_price = get_price(symbol)
             if current_price is None:
                 continue
 
-            spark_cache_key = f"spark_{s['symbol']}"
+            spark_cache_key = f"spark_{symbol}"
             spark = cache.get(spark_cache_key) or []
 
             if not spark:
-                if s["type"] == "crypto":
+                if asset["type"] == "crypto":
+                    # Binance klines
                     try:
                         r = requests.get(
                             "https://api.binance.com/api/v3/klines",
-                            params={"symbol": s["binance"], "interval": "1h", "limit": 24},
+                            params={"symbol": asset["binance"], "interval": "1h", "limit": 24},
                             timeout=5,
                         )
                         if r.status_code == 200:
@@ -721,25 +727,29 @@ def get_market_list_api(request):
                     except Exception:
                         pass
 
-                    if not spark and s.get("cg_id"):
-                        try:
-                            r = requests.get(
-                                f"https://api.coingecko.com/api/v3/coins/{s['cg_id']}/market_chart",
-                                params={"vs_currency": "usd", "days": 1},
-                                timeout=10,
-                            )
-                            if r.status_code == 200:
-                                prices = r.json().get("prices", [])
-                                step = max(1, len(prices) // 24)
-                                spark = [float(p[1]) for p in prices[::step]][:24]
-                        except Exception:
-                            pass
+                    # CoinGecko fallback
+                    if not spark:
+                        cg_id = CG_IDS.get(symbol)
+                        if cg_id:
+                            try:
+                                r = requests.get(
+                                    f"https://api.coingecko.com/api/v3/coins/{cg_id}/market_chart",
+                                    params={"vs_currency": "usd", "days": 1},
+                                    timeout=10,
+                                )
+                                if r.status_code == 200:
+                                    prices = r.json().get("prices", [])
+                                    step = max(1, len(prices) // 24)
+                                    spark = [float(p[1]) for p in prices[::step]][:24]
+                            except Exception:
+                                pass
                 else:
+                    # Forex - Twelve Data
                     try:
                         r = requests.get(
                             "https://api.twelvedata.com/time_series",
                             params={
-                                "symbol": s["pair"],
+                                "symbol": asset["pair"],
                                 "interval": "1h",
                                 "outputsize": 24,
                                 "apikey": settings.TWELVEDATA_API_KEY,
@@ -755,6 +765,7 @@ def get_market_list_api(request):
                 if spark:
                     cache.set(spark_cache_key, spark, 600)
 
+            # Change %
             if len(spark) >= 2:
                 first = spark[0]
                 last = spark[-1]
@@ -763,9 +774,9 @@ def get_market_list_api(request):
                 change_pct = 0
 
             result.append({
-                "symbol": s["symbol"],
-                "label": s["label"],
-                "icon_img": s.get("icon_img", ""),
+                "symbol": symbol,
+                "label": asset["label"],
+                "icon_img": COIN_ICONS.get(symbol, ""),
                 "price": str(current_price),
                 "change_pct": round(change_pct, 2),
                 "spark": spark,
@@ -792,7 +803,6 @@ def contract_dashboard(request):
     total_margin = Decimal("0")
 
     for p in open_positions:
-        # FRESH price for live P&L
         current_price = get_price(p.symbol, force_refresh=True) or Decimal("0")
 
         if current_price > 0:
@@ -876,7 +886,6 @@ def open_position(request):
         messages.error(request, "Insufficient balance. Please deposit funds first.")
         return redirect("contract_dashboard")
 
-    # FRESH price
     cache.delete(f"price_{symbol}")
     price = get_price(symbol, force_refresh=True)
     if price is None or price <= 0:
@@ -924,7 +933,6 @@ def close_position_contract(request, position_id):
         messages.error(request, "Position not found or already closed.")
         return redirect("contract_dashboard")
 
-    # FRESH price
     cache.delete(f"price_{position.symbol}")
     current_price = get_price(position.symbol, force_refresh=True)
     if current_price is None or current_price <= 0:
@@ -1022,9 +1030,7 @@ def mobile_trade(request, symbol):
 
 @login_required
 def get_mobile_positions_api(request):
-    """Mobile Orders tab — open contract positions + LIVE P&L.
-    Cache-first for instant response, background refresh.
-    """
+    """Mobile Orders tab — cache-first for instant response."""
     account = get_account(request.user)
     positions = account.positions.filter(status="OPEN").order_by("-opened_at")
 
@@ -1033,7 +1039,6 @@ def get_mobile_positions_api(request):
     total_margin = Decimal("0")
 
     for p in positions:
-        # Cache-first — instant response
         current_price = get_price(p.symbol) or Decimal("0")
 
         if current_price > 0:
