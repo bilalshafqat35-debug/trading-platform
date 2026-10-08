@@ -43,7 +43,6 @@ ASSETS = {
     "EURGBP": {"label": "EUR/GBP", "type": "forex", "pair": "EUR/GBP"},
 }
 
-# CoinGecko IDs for crypto
 CG_IDS = {
     "BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana",
     "BNB": "binancecoin", "XRP": "ripple", "ADA": "cardano",
@@ -53,7 +52,6 @@ CG_IDS = {
     "ATOM": "cosmos", "UNI": "uniswap",
 }
 
-# Coin icons
 COIN_ICONS = {
     "BTC": "https://assets.coingecko.com/coins/images/1/small/bitcoin.png",
     "ETH": "https://assets.coingecko.com/coins/images/279/small/ethereum.png",
@@ -80,16 +78,16 @@ COIN_ICONS = {
 }
 
 
-# ============================================================
-# HELPERS
-# ============================================================
-
 def get_trending_coins():
     coins = cache.get("trending_coins")
     if coins is not None:
         return coins
     try:
-        r = requests.get("https://api.coingecko.com/api/v3/search/trending", timeout=10)
+        r = requests.get(
+            "https://api.coingecko.com/api/v3/search/trending",
+            headers={"x-cg-demo-api-key": settings.COINGECKO_API_KEY},
+            timeout=10,
+        )
         r.raise_for_status()
         data = r.json()
         coins = [
@@ -139,17 +137,13 @@ def get_avg_buy_price(account, symbol):
 
 
 def get_price(symbol, force_refresh=False):
-    """Fetch price — Binance primary, CoinGecko fallback (crypto); TwelveData (forex).
-
-    force_refresh=True: Cache bypass karo aur fresh price fetch karo.
-    """
+    """Fetch price — CoinGecko (with demo API key) for crypto; TwelveData for forex."""
     if symbol not in ASSETS:
         return None
 
     asset = ASSETS[symbol]
     cache_key = f"price_{symbol}"
 
-    # Cache check (agar force_refresh nahi)
     if not force_refresh:
         cached = cache.get(cache_key)
         if cached is not None:
@@ -159,44 +153,23 @@ def get_price(symbol, force_refresh=False):
                 pass
 
     if asset["type"] == "crypto":
-        # Binance
-        try:
-            r = requests.get(
-                "https://api.binance.com/api/v3/ticker/price",
-                params={"symbol": asset["binance"]},
-                timeout=5,
-            )
-            if r.status_code == 200:
-                data = r.json()
-                if "price" in data:
-                    price = Decimal(str(data["price"]))
-                    cache.set(cache_key, str(price), 30)
-                    return price
-        except (requests.RequestException, KeyError, InvalidOperation, ValueError):
-            pass
-
-        # CoinGecko fallback
-        try:
-            cg_id = CG_IDS.get(symbol)
-            if cg_id:
+        cg_id = CG_IDS.get(symbol)
+        if cg_id:
+            try:
                 r = requests.get(
-    "https://api.coingecko.com/api/v3/simple/price",
-    params={
-        "ids": cg_id,
-        "vs_currencies": "usd",
-        "x_cg_demo_api_key": settings.COINGECKO_API_KEY,
-    },
-    timeout=15,
-)
+                    "https://api.coingecko.com/api/v3/simple/price",
+                    params={"ids": cg_id, "vs_currencies": "usd"},
+                    headers={"x-cg-demo-api-key": settings.COINGECKO_API_KEY},
+                    timeout=15,
+                )
                 if r.status_code == 200:
                     data = r.json()
                     if cg_id in data and "usd" in data[cg_id]:
                         price = Decimal(str(data[cg_id]["usd"]))
                         cache.set(cache_key, str(price), 30)
                         return price
-        except (requests.RequestException, KeyError, InvalidOperation, ValueError):
-            pass
-
+            except (requests.RequestException, KeyError, InvalidOperation, ValueError):
+                pass
         return None
 
     # Forex
@@ -287,7 +260,6 @@ def trade(request):
         messages.error(request, "Invalid data. Please try again.")
         return redirect("dashboard")
 
-    # Fresh price
     cache.delete(f"price_{symbol}")
     price = get_price(symbol, force_refresh=True)
     if price is None or price <= 0:
@@ -609,7 +581,7 @@ def get_override_status_api(request, symbol):
 
 @login_required
 def get_klines_api(request, symbol):
-    """Candles — Binance primary, CoinGecko fallback. 2-minute cache."""
+    """Candles — CoinGecko with demo API key. 2-minute cache."""
     if symbol not in ASSETS:
         return JsonResponse({"error": "Invalid symbol"}, status=400)
 
@@ -626,60 +598,33 @@ def get_klines_api(request, symbol):
         return JsonResponse(cached)
 
     candles = []
+    cg_id = CG_IDS.get(symbol)
 
-    # Attempt 1: Binance
-    try:
-        r = requests.get(
-            "https://api.binance.com/api/v3/klines",
-            params={"symbol": asset["binance"], "interval": "5m", "limit": 100},
-            timeout=5,
-        )
-        if r.status_code == 200:
-            raw = r.json()
-            for k in raw:
-                try:
-                    candles.append({
-                        "time": int(k[0]) // 1000,
-                        "open": float(k[1]), "high": float(k[2]),
-                        "low": float(k[3]), "close": float(k[4]),
-                    })
-                except (IndexError, ValueError):
-                    continue
-    except (requests.RequestException, ValueError):
-        pass
-
-    # Attempt 2: CoinGecko fallback
-    if not candles:
-        cg_id = CG_IDS.get(symbol)
-        if cg_id:
-            try:
-                r = requests.get(
-    f"https://api.coingecko.com/api/v3/coins/{cg_id}/ohlc",
-    params={
-        "vs_currency": "usd",
-        "days": 1,
-        "x_cg_demo_api_key": settings.COINGECKO_API_KEY,
-    },
-    timeout=15,
-)
-                if r.status_code == 200:
-                    raw = r.json()
-                    for k in raw:
-                        try:
-                            candles.append({
-                                "time": int(k[0]) // 1000,
-                                "open": float(k[1]), "high": float(k[2]),
-                                "low": float(k[3]), "close": float(k[4]),
-                            })
-                        except (IndexError, ValueError):
-                            continue
-            except (requests.RequestException, ValueError):
-                pass
+    if cg_id:
+        try:
+            r = requests.get(
+                f"https://api.coingecko.com/api/v3/coins/{cg_id}/ohlc",
+                params={"vs_currency": "usd", "days": 1},
+                headers={"x-cg-demo-api-key": settings.COINGECKO_API_KEY},
+                timeout=15,
+            )
+            if r.status_code == 200:
+                raw = r.json()
+                for k in raw:
+                    try:
+                        candles.append({
+                            "time": int(k[0]) // 1000,
+                            "open": float(k[1]), "high": float(k[2]),
+                            "low": float(k[3]), "close": float(k[4]),
+                        })
+                    except (IndexError, ValueError):
+                        continue
+        except (requests.RequestException, ValueError):
+            pass
 
     if not candles:
         return JsonResponse({"error": "Failed to fetch klines"}, status=503)
 
-    # Apply override offset
     if override:
         pct = float(override.intensity_percent) / 100.0
         factor = (1 + pct) if override.direction == "UP" else (1 - pct)
@@ -691,7 +636,7 @@ def get_klines_api(request, symbol):
 
     response_data = {
         "symbol": symbol,
-        "interval": "5m" if len(candles) > 50 else "1h",
+        "interval": "1h",
         "override_active": bool(override),
         "direction": override.direction if override else None,
         "candles": candles,
@@ -706,7 +651,7 @@ def get_market_list_api(request):
     """Market list — 22 symbols. Cached 5 minutes."""
     import time as _time
 
-    cache_key = "market_list_data_v2"
+    cache_key = "market_list_data_v3"
     cached = cache.get(cache_key)
     if cached:
         return JsonResponse(cached)
@@ -724,41 +669,24 @@ def get_market_list_api(request):
 
             if not spark:
                 if asset["type"] == "crypto":
-                    # Binance klines
-                    try:
-                        r = requests.get(
-                            "https://api.binance.com/api/v3/klines",
-                            params={"symbol": asset["binance"], "interval": "1h", "limit": 24},
-                            timeout=5,
-                        )
-                        if r.status_code == 200:
-                            raw = r.json()
-                            spark = [float(k[4]) for k in raw]
-                    except Exception:
-                        pass
+                    cg_id = CG_IDS.get(symbol)
+                    if cg_id:
+                        try:
+                            r = requests.get(
+                                f"https://api.coingecko.com/api/v3/coins/{cg_id}/market_chart",
+                                params={"vs_currency": "usd", "days": 1},
+                                headers={"x-cg-demo-api-key": settings.COINGECKO_API_KEY},
+                                timeout=15,
+                            )
+                            if r.status_code == 200:
+                                prices = r.json().get("prices", [])
+                                step = max(1, len(prices) // 24)
+                                spark = [float(p[1]) for p in prices[::step]][:24]
+                        except Exception:
+                            pass
 
-                    # CoinGecko fallback
-                    if not spark:
-                        cg_id = CG_IDS.get(symbol)
-                        if cg_id:
-                            try:
-                                r = requests.get(
-    f"https://api.coingecko.com/api/v3/coins/{cg_id}/market_chart",
-    params={
-        "vs_currency": "usd",
-        "days": 1,
-        "x_cg_demo_api_key": settings.COINGECKO_API_KEY,
-    },
-    timeout=15,
-)
-                                if r.status_code == 200:
-                                    prices = r.json().get("prices", [])
-                                    step = max(1, len(prices) // 24)
-                                    spark = [float(p[1]) for p in prices[::step]][:24]
-                            except Exception:
-                                pass
+                    _time.sleep(0.3)
                 else:
-                    # Forex — Twelve Data
                     try:
                         r = requests.get(
                             "https://api.twelvedata.com/time_series",
@@ -777,10 +705,7 @@ def get_market_list_api(request):
                         pass
 
                 if spark:
-                    cache.set(spark_cache_key, spark, 900)  # 15 min
-
-                # Delay to avoid rate limit
-                _time.sleep(0.3)
+                    cache.set(spark_cache_key, spark, 900)
 
             if len(spark) >= 2:
                 first = spark[0]
@@ -801,7 +726,7 @@ def get_market_list_api(request):
             continue
 
     response_data = {"symbols": result}
-    cache.set(cache_key, response_data, 300)  # 5 min
+    cache.set(cache_key, response_data, 300)
     return JsonResponse(response_data)
 
 
@@ -819,7 +744,7 @@ def contract_dashboard(request):
     total_margin = Decimal("0")
 
     for p in open_positions:
-        current_price = get_price(p.symbol, force_refresh=True) or Decimal("0")
+        current_price = get_price(p.symbol) or Decimal("0")
 
         if current_price > 0:
             if p.direction == "LONG":
