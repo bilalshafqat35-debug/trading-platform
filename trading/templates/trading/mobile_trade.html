@@ -38,14 +38,14 @@
 
   <!-- Chart -->
   <div class="trade-chart-wrapper">
-    <div class="trade-chart-inner">
+        <div class="trade-chart-inner">
       <div class="tradingview-widget-container" style="height:100%;width:100%">
         <div class="tradingview-widget-container__widget" style="height:100%;width:100%"></div>
         <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
         {
           "symbol": "{{ tv_symbol }}",
           "interval": "5",
-          "theme": "light",
+          "theme": "dark",
           "autosize": true,
           "timezone": "Etc/UTC",
           "locale": "en",
@@ -55,7 +55,24 @@
           "save_image": false,
           "allow_symbol_change": false,
           "withdateranges": false,
-          "details": false
+          "details": false,
+          "backgroundColor": "rgba(15, 20, 41, 1)",
+          "gridColor": "rgba(16, 185, 129, 0.08)",
+          "toolbar_bg": "rgba(20, 25, 48, 1)",
+          "overrides": {
+            "paneProperties.background": "#0f1429",
+            "paneProperties.backgroundType": "solid",
+            "paneProperties.vertGridProperties.color": "rgba(16, 185, 129, 0.08)",
+            "paneProperties.horzGridProperties.color": "rgba(16, 185, 129, 0.08)",
+            "scalesProperties.textColor": "#94a3b8",
+            "scalesProperties.lineColor": "rgba(16, 185, 129, 0.15)",
+            "mainSeriesProperties.candleStyle.upColor": "#10b981",
+            "mainSeriesProperties.candleStyle.downColor": "#ef4444",
+            "mainSeriesProperties.candleStyle.borderUpColor": "#10b981",
+            "mainSeriesProperties.candleStyle.borderDownColor": "#ef4444",
+            "mainSeriesProperties.candleStyle.wickUpColor": "#10b981",
+            "mainSeriesProperties.candleStyle.wickDownColor": "#ef4444"
+          }
         }
         </script>
       </div>
