@@ -1162,6 +1162,122 @@ window.switchMobileTab = function (tabName, btn) {
     setTimeout(loadMobilePositions, 200);
   }
 };
+// ============================================================
+// ORDERS TAB — LIVE P&L AUTO-REFRESH (every 1 second)
+// ============================================================
+var pnlInterval = null;
+
+function startPnlRefresh() {
+  if (pnlInterval) return; // already running
+  
+  pnlInterval = setInterval(function () {
+    // Check if Orders tab is active
+    var ordersTab = document.getElementById('tab-orders');
+    var positionsSub = document.getElementById('subtab-positions');
+    
+    if (!ordersTab || !ordersTab.classList.contains('active')) return;
+    if (!positionsSub || !positionsSub.classList.contains('active')) return;
+    
+    // Fetch fresh P&L
+    fetch('/api/mobile-positions/')
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        updatePositionsUI(data);
+      })
+      .catch(function () {});
+  }, 1000); // 1 second
+}
+
+function stopPnlRefresh() {
+  if (pnlInterval) {
+    clearInterval(pnlInterval);
+    pnlInterval = null;
+  }
+}
+
+function updatePositionsUI(data) {
+  var positions = data.positions || [];
+  
+  // Update summary strip
+  var totalPnlEl = document.getElementById('osTotalPnl');
+  if (totalPnlEl) {
+    var totalPnl = parseFloat(data.total_pnl);
+    totalPnlEl.textContent = (totalPnl >= 0 ? '+' : '') + '$' + Math.abs(totalPnl).toFixed(2);
+    totalPnlEl.style.color = totalPnl >= 0 ? '#16a34a' : '#dc2626';
+  }
+  
+  var marginEl = document.getElementById('osTotalMargin');
+  if (marginEl) marginEl.textContent = '$' + parseFloat(data.total_margin).toFixed(2);
+  
+  var countEl = document.getElementById('osCount');
+  if (countEl) countEl.textContent = data.count;
+  
+  // Update each position card
+  var cards = document.querySelectorAll('.order-position-card');
+  cards.forEach(function (card) {
+    var symbolEl = card.querySelector('.opc-symbol');
+    if (!symbolEl) return;
+    
+    var sym = symbolEl.textContent.trim();
+    var pos = positions.find(function (p) { return p.symbol === sym; });
+    if (!pos) return;
+    
+    // Update current price + P&L
+    var rows = card.querySelectorAll('.opc-row');
+    rows.forEach(function (row) {
+      var label = row.querySelector('.opc-label');
+      var value = row.querySelector('.opc-val');
+      if (!label || !value) return;
+      
+      var labelText = label.textContent.trim();
+      
+      if (labelText === 'Current') {
+        value.textContent = '$' + parseFloat(pos.current_price).toFixed(2);
+      } else if (labelText === 'P&L') {
+        var pnl = parseFloat(pos.pnl);
+        var pnlPct = parseFloat(pos.pnl_pct);
+        var sign = pnl >= 0 ? '+' : '';
+        value.textContent = sign + '$' + Math.abs(pnl).toFixed(2) + ' (' + sign + pnlPct.toFixed(2) + '%)';
+        
+        row.classList.remove('profit', 'loss');
+        row.classList.add(pnl >= 0 ? 'profit' : 'loss');
+      }
+    });
+  });
+}
+
+// Start refresh when Orders tab is opened
+document.addEventListener('DOMContentLoaded', function () {
+  // Auto-start when user switches to Orders tab
+  var origSwitchOrdersSubTab = window.switchOrdersSubTab;
+  window.switchOrdersSubTab = function (name, btn) {
+    if (origSwitchOrdersSubTab) origSwitchOrdersSubTab(name, btn);
+    if (name === 'positions') {
+      startPnlRefresh();
+    } else {
+      stopPnlRefresh();
+    }
+  };
+  
+  // Stop when leaving Orders tab
+  var origSwitchMobileTab = window.switchMobileTab;
+  window.switchMobileTab = function (tabName, btn) {
+    if (origSwitchMobileTab) origSwitchMobileTab(tabName, btn);
+    if (tabName === 'orders') {
+      setTimeout(startPnlRefresh, 500);
+    } else {
+      stopPnlRefresh();
+    }
+  };
+  
+  // Also start on page load if already on Orders
+  setTimeout(function () {
+    var ordersTab = document.getElementById('tab-orders');
+    if (ordersTab && ordersTab.classList.contains('active')) {
+      startPnlRefresh();
+    }
+  }, 500);
+});
   </script>
 </body>
 </html>

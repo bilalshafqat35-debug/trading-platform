@@ -1022,7 +1022,9 @@ def mobile_trade(request, symbol):
 
 @login_required
 def get_mobile_positions_api(request):
-    """Mobile Orders tab — open contract positions + LIVE P&L."""
+    """Mobile Orders tab — open contract positions + LIVE P&L.
+    Cache-first for instant response, background refresh.
+    """
     account = get_account(request.user)
     positions = account.positions.filter(status="OPEN").order_by("-opened_at")
 
@@ -1031,9 +1033,8 @@ def get_mobile_positions_api(request):
     total_margin = Decimal("0")
 
     for p in positions:
-        # FRESH price for live P&L
-        cache.delete(f"price_{p.symbol}")
-        current_price = get_price(p.symbol, force_refresh=True) or Decimal("0")
+        # Cache-first — instant response
+        current_price = get_price(p.symbol) or Decimal("0")
 
         if current_price > 0:
             if p.direction == "LONG":
