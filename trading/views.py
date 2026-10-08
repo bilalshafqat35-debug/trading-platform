@@ -180,10 +180,14 @@ def get_price(symbol, force_refresh=False):
             cg_id = CG_IDS.get(symbol)
             if cg_id:
                 r = requests.get(
-                    "https://api.coingecko.com/api/v3/simple/price",
-                    params={"ids": cg_id, "vs_currencies": "usd"},
-                    timeout=10,
-                )
+    "https://api.coingecko.com/api/v3/simple/price",
+    params={
+        "ids": cg_id,
+        "vs_currencies": "usd",
+        "x_cg_demo_api_key": settings.COINGECKO_API_KEY,
+    },
+    timeout=15,
+)
                 if r.status_code == 200:
                     data = r.json()
                     if cg_id in data and "usd" in data[cg_id]:
@@ -650,10 +654,14 @@ def get_klines_api(request, symbol):
         if cg_id:
             try:
                 r = requests.get(
-                    f"https://api.coingecko.com/api/v3/coins/{cg_id}/ohlc",
-                    params={"vs_currency": "usd", "days": 1},
-                    timeout=10,
-                )
+    f"https://api.coingecko.com/api/v3/coins/{cg_id}/ohlc",
+    params={
+        "vs_currency": "usd",
+        "days": 1,
+        "x_cg_demo_api_key": settings.COINGECKO_API_KEY,
+    },
+    timeout=15,
+)
                 if r.status_code == 200:
                     raw = r.json()
                     for k in raw:
@@ -735,10 +743,14 @@ def get_market_list_api(request):
                         if cg_id:
                             try:
                                 r = requests.get(
-                                    f"https://api.coingecko.com/api/v3/coins/{cg_id}/market_chart",
-                                    params={"vs_currency": "usd", "days": 1},
-                                    timeout=10,
-                                )
+    f"https://api.coingecko.com/api/v3/coins/{cg_id}/market_chart",
+    params={
+        "vs_currency": "usd",
+        "days": 1,
+        "x_cg_demo_api_key": settings.COINGECKO_API_KEY,
+    },
+    timeout=15,
+)
                                 if r.status_code == 200:
                                     prices = r.json().get("prices", [])
                                     step = max(1, len(prices) // 24)

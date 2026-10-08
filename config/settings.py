@@ -108,3 +108,6 @@ TWELVEDATA_API_KEY = os.environ.get(
 LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "dashboard"
 LOGOUT_REDIRECT_URL = "login"
+
+# CoinGecko Demo API Key
+COINGECKO_API_KEY = "CG-6ZbGQS8zHRxGBxJjGV7nZwKG"
