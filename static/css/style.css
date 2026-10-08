@@ -1893,3 +1893,511 @@ h3 {
     height: 18px !important;
   }
 }
+/* ============================================================ */
+/* PASSWORD TOGGLE — FINAL FIX (inside input)                   */
+/* ============================================================ */
+.password-wrapper {
+  position: relative !important;
+  width: 100% !important;
+  display: block !important;
+}
+.password-wrapper input {
+  width: 100% !important;
+  padding-right: 48px !important;
+  box-sizing: border-box !important;
+  display: block !important;
+}
+.password-toggle,
+.auth-card .password-toggle,
+.password-wrapper .password-toggle {
+  position: absolute !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  right: 0 !important;
+  left: auto !important;
+  transform: none !important;
+  background: transparent !important;
+  border: 0 !important;
+  cursor: pointer !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: #a08a4f !important;
+  width: 48px !important;
+  height: 100% !important;
+  min-width: 48px !important;
+  max-width: 48px !important;
+  border-radius: 0 8px 8px 0 !important;
+  box-shadow: none !important;
+  opacity: 1 !important;
+  z-index: 2 !important;
+}
+.password-toggle:hover {
+  color: #d4af37 !important;
+  background: transparent !important;
+}
+.password-toggle svg {
+  width: 20px !important;
+  height: 20px !important;
+  stroke: currentColor !important;
+  fill: none !important;
+  stroke-width: 2 !important;
+  stroke-linecap: round !important;
+  stroke-linejoin: round !important;
+  display: block !important;
+  margin: 0 auto !important;
+  position: static !important;
+  transform: none !important;
+}
+
+/* Mobile specific */
+@media (max-width: 480px) {
+  .password-toggle,
+  .auth-card .password-toggle,
+  .password-wrapper .password-toggle {
+    width: 44px !important;
+    min-width: 44px !important;
+    max-width: 44px !important;
+  }
+  .password-wrapper input {
+    padding-right: 44px !important;
+  }
+  .password-toggle svg {
+    width: 18px !important;
+    height: 18px !important;
+  }
+}
+/* ============================================================ */
+/* CRYPTO AUTH PAGES (Login + Register) — DARK THEME            */
+/* ============================================================ */
+.crypto-auth-body {
+  margin: 0 !important;
+  padding: 0 !important;
+  background: #0a0e27 !important;
+  min-height: 100vh !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  color: #e2e8f0 !important;
+  overflow-x: hidden !important;
+  position: relative !important;
+}
+.crypto-auth-body::before {
+  display: none !important;
+}
+
+/* Background animated chart */
+.crypto-bg {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background:
+    radial-gradient(circle at 20% 30%, rgba(16, 185, 129, 0.08), transparent 40%),
+    radial-gradient(circle at 80% 70%, rgba(59, 130, 246, 0.06), transparent 40%),
+    linear-gradient(180deg, #0a0e27 0%, #0f1429 50%, #0a0e27 100%);
+  z-index: 0;
+  pointer-events: none;
+}
+.crypto-bg::after {
+  content: "";
+  position: absolute;
+  bottom: 0; left: 0;
+  width: 100%; height: 45%;
+  background-image:
+    repeating-linear-gradient(90deg, transparent 0px, transparent 30px, rgba(16,185,129,0.04) 30px, rgba(16,185,129,0.04) 31px),
+    repeating-linear-gradient(0deg, transparent 0px, transparent 30px, rgba(16,185,129,0.04) 30px, rgba(16,185,129,0.04) 31px);
+  animation: gridMove 20s linear infinite;
+  opacity: 0.6;
+}
+@keyframes gridMove {
+  0% { transform: translate(0, 0); }
+  100% { transform: translate(30px, 30px); }
+}
+
+/* Top ticker */
+.crypto-ticker {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  gap: 24px;
+  padding: 12px 20px;
+  background: rgba(15, 20, 41, 0.85);
+  border-bottom: 1px solid rgba(16, 185, 129, 0.15);
+  overflow-x: auto;
+  white-space: nowrap;
+  scrollbar-width: none;
+  backdrop-filter: blur(10px);
+}
+.crypto-ticker::-webkit-scrollbar { display: none; }
+.ticker-item {
+  font-size: 12px;
+  color: #94a3b8;
+  font-weight: 600;
+  flex-shrink: 0;
+  letter-spacing: 0.2px;
+}
+.ticker-price {
+  color: #e2e8f0;
+  margin-left: 6px;
+  font-family: 'Courier New', monospace;
+  font-weight: 700;
+}
+.ticker-up { color: #10b981; margin-left: 4px; }
+.ticker-down { color: #ef4444; margin-left: 4px; }
+
+/* Auth wrapper */
+.crypto-auth-wrapper {
+  position: relative;
+  z-index: 2;
+  min-height: calc(100vh - 100px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 30px 16px;
+}
+
+/* Auth card */
+.crypto-auth-card {
+  width: 100%;
+  max-width: 440px;
+  background: rgba(20, 25, 48, 0.85);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 20px;
+  padding: 34px 30px 26px;
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(16, 185, 129, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  animation: cryptoSlideUp 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes cryptoSildeUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes cryptoSlideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Brand */
+.crypto-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+.crypto-brand-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #10b981, #059669);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.4);
+}
+.crypto-brand-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.1;
+}
+.crypto-brand-name {
+  font-size: 20px;
+  font-weight: 900;
+  color: #ffffff;
+  letter-spacing: -0.5px;
+}
+.crypto-brand-tag {
+  font-size: 9px;
+  color: #10b981;
+  letter-spacing: 2px;
+  font-weight: 800;
+  background: rgba(16, 185, 129, 0.12);
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-top: 3px;
+}
+
+/* Title */
+.crypto-title {
+  margin: 0 0 6px;
+  font-size: 26px;
+  font-weight: 800;
+  color: #ffffff;
+  text-align: center;
+  letter-spacing: -0.5px;
+  background: none;
+  -webkit-text-fill-color: #ffffff;
+}
+.crypto-subtitle {
+  margin: 0 0 22px;
+  font-size: 13px;
+  color: #94a3b8;
+  text-align: center;
+  line-height: 1.5;
+}
+
+/* Errors/Info */
+.crypto-error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-left: 4px solid #ef4444;
+  border-radius: 10px;
+  padding: 11px 14px;
+  font-size: 13px;
+  color: #fca5a5;
+  margin-bottom: 16px;
+  animation: shake 0.4s ease;
+}
+.crypto-info {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-left: 4px solid #10b981;
+  border-radius: 10px;
+  padding: 11px 14px;
+  font-size: 13px;
+  color: #6ee7b7;
+  margin-bottom: 16px;
+}
+
+/* Form */
+.crypto-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.crypto-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+/* Input field */
+.crypto-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(10, 14, 39, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  border-radius: 10px;
+  padding: 0 14px;
+  height: 50px;
+  transition: all 0.25s ease;
+  position: relative;
+}
+.crypto-field:focus-within {
+  border-color: #10b981;
+  background: rgba(10, 14, 39, 0.95);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+}
+.crypto-field-icon {
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+.crypto-field input {
+  flex: 1;
+  border: 0 !important;
+  background: transparent !important;
+  color: #e2e8f0 !important;
+  font-size: 14px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+  font-family: inherit !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  border-radius: 0 !important;
+}
+.crypto-field input::placeholder {
+  color: #64748b;
+}
+.crypto-field input:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px rgba(10, 14, 39, 0.95) inset !important;
+  -webkit-text-fill-color: #e2e8f0 !important;
+}
+
+/* Eye toggle inside field */
+.crypto-eye {
+  background: transparent !important;
+  border: 0 !important;
+  cursor: pointer !important;
+  color: #10b981 !important;
+  padding: 6px !important;
+  margin: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  transition: color 0.2s !important;
+  width: auto !important;
+  height: auto !important;
+  min-width: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+.crypto-eye:hover {
+  color: #34d399 !important;
+}
+.crypto-eye svg {
+  display: block !important;
+}
+
+/* Submit button */
+.crypto-submit {
+  width: 100%;
+  height: 52px;
+  border: 0;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-top: 8px;
+  letter-spacing: 0.4px;
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.35);
+}
+.crypto-submit:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(16, 185, 129, 0.5);
+}
+.crypto-submit:active {
+  transform: translateY(0);
+}
+
+/* Footer */
+.crypto-footer {
+  text-align: center;
+  margin-top: 20px;
+  font-size: 13px;
+  color: #94a3b8;
+}
+.crypto-footer a {
+  color: #10b981;
+  font-weight: 700;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.crypto-footer a:hover {
+  color: #34d399;
+  text-decoration: underline;
+}
+.crypto-terms {
+  text-align: center;
+  margin-top: 14px;
+  font-size: 11px;
+  color: #64748b;
+  line-height: 1.5;
+}
+.crypto-terms a {
+  color: #94a3b8;
+  text-decoration: underline;
+}
+
+/* Bottom badges */
+.crypto-badges {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  padding: 16px 20px 24px;
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 600;
+  flex-wrap: wrap;
+}
+.crypto-badges span {
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.15);
+  padding: 6px 12px;
+  border-radius: 20px;
+}
+
+/* ============================================================ */
+/* MOBILE RESPONSIVE                                            */
+/* ============================================================ */
+@media (max-width: 480px) {
+  .crypto-ticker {
+    padding: 10px 14px;
+    gap: 16px;
+  }
+  .ticker-item {
+    font-size: 11px;
+  }
+  .crypto-auth-wrapper {
+    padding: 20px 12px;
+    min-height: calc(100vh - 80px);
+    align-items: flex-start;
+    padding-top: 30px;
+  }
+  .crypto-auth-card {
+    padding: 26px 20px 20px;
+    border-radius: 16px;
+    max-width: 100%;
+  }
+  .crypto-brand-icon {
+    width: 42px;
+    height: 42px;
+  }
+  .crypto-brand-name {
+    font-size: 18px;
+  }
+  .crypto-title {
+    font-size: 22px;
+  }
+  .crypto-subtitle {
+    font-size: 12px;
+    margin-bottom: 18px;
+  }
+  .crypto-field {
+    height: 46px;
+    padding: 0 12px;
+  }
+  .crypto-field input {
+    font-size: 14px !important;
+  }
+  .crypto-submit {
+    height: 48px;
+    font-size: 14px;
+  }
+  .crypto-badges {
+    gap: 8px;
+    padding: 12px 14px 20px;
+    font-size: 10px;
+  }
+  .crypto-badges span {
+    padding: 5px 10px;
+  }
+  .crypto-field-row {
+    grid-template-columns: 1fr;
+  }
+}
+/* ============================================================ */
+/* CRYPTO BG CHART (candlesticks + line)                        */
+/* ============================================================ */
+.crypto-bg-svg {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 75%;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* On mobile, make chart less prominent */
+@media (max-width: 480px) {
+  .crypto-bg-svg {
+    height: 60%;
+    opacity: 0.4;
+  }
+}
+
+/* Add subtle glow animation to the chart line */
+.crypto-bg-svg path[stroke="#10b981"] {
+  animation: chartGlow 4s ease-in-out infinite alternate;
+}
+@keyframes chartGlow {
+  0% { opacity: 0.3; }
+  100% { opacity: 0.7; }
+}
