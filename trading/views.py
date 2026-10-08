@@ -695,8 +695,10 @@ def get_klines_api(request, symbol):
 
 @login_required
 def get_market_list_api(request):
-    """Market list — 22 symbols with sparklines. Cached 120 seconds."""
-    cache_key = "market_list_data"
+    """Market list — 22 symbols. Cached 5 minutes."""
+    import time as _time
+
+    cache_key = "market_list_data_v2"
     cached = cache.get(cache_key)
     if cached:
         return JsonResponse(cached)
@@ -744,7 +746,7 @@ def get_market_list_api(request):
                             except Exception:
                                 pass
                 else:
-                    # Forex - Twelve Data
+                    # Forex — Twelve Data
                     try:
                         r = requests.get(
                             "https://api.twelvedata.com/time_series",
@@ -763,9 +765,11 @@ def get_market_list_api(request):
                         pass
 
                 if spark:
-                    cache.set(spark_cache_key, spark, 600)
+                    cache.set(spark_cache_key, spark, 900)  # 15 min
 
-            # Change %
+                # Delay to avoid rate limit
+                _time.sleep(0.3)
+
             if len(spark) >= 2:
                 first = spark[0]
                 last = spark[-1]
@@ -785,7 +789,7 @@ def get_market_list_api(request):
             continue
 
     response_data = {"symbols": result}
-    cache.set(cache_key, response_data, 120)
+    cache.set(cache_key, response_data, 300)  # 5 min
     return JsonResponse(response_data)
 
 
