@@ -35,14 +35,14 @@ ASSETS = {
     "TRX": {"label": "Tron", "type": "crypto", "binance": "TRXUSDT"},
     "ATOM": {"label": "Cosmos", "type": "crypto", "binance": "ATOMUSDT"},
     "UNI": {"label": "Uniswap", "type": "crypto", "binance": "UNIUSDT"},
+    "XAUUSD": {"label": "Gold", "type": "forex", "pair": "XAU/USD"},
+    "XAGUSD": {"label": "Silver", "type": "forex", "pair": "XAG/USD"},
     "EURUSD": {"label": "EUR/USD", "type": "forex", "pair": "EUR/USD"},
     "GBPUSD": {"label": "GBP/USD", "type": "forex", "pair": "GBP/USD"},
     "USDJPY": {"label": "USD/JPY", "type": "forex", "pair": "USD/JPY"},
     "AUDUSD": {"label": "AUD/USD", "type": "forex", "pair": "AUD/USD"},
     "USDCAD": {"label": "USD/CAD", "type": "forex", "pair": "USD/CAD"},
     "EURGBP": {"label": "EUR/GBP", "type": "forex", "pair": "EUR/GBP"},
-        "XAUUSD": {"label": "Gold", "type": "forex", "pair": "XAU/USD"},
-    "XAGUSD": {"label": "Silver", "type": "forex", "pair": "XAG/USD"},
 }
 
 CG_IDS = {
@@ -71,14 +71,14 @@ COIN_ICONS = {
     "TRX": "https://assets.coingecko.com/coins/images/1094/small/tron-logo.png",
     "ATOM": "https://assets.coingecko.com/coins/images/1481/small/cosmos_hub.png",
     "UNI": "https://assets.coingecko.com/coins/images/12504/small/uniswap-uni.png",
+    "XAUUSD": "https://flagcdn.com/w80/un.png",
+    "XAGUSD": "https://flagcdn.com/w80/un.png",
     "EURUSD": "https://flagcdn.com/w80/eu.png",
     "GBPUSD": "https://flagcdn.com/w80/gb.png",
     "USDJPY": "https://flagcdn.com/w80/jp.png",
     "AUDUSD": "https://flagcdn.com/w80/au.png",
     "USDCAD": "https://flagcdn.com/w80/ca.png",
     "EURGBP": "https://flagcdn.com/w80/eu.png",
-        "XAUUSD": "https://flagcdn.com/w80/un.png",
-    "XAGUSD": "https://flagcdn.com/w80/un.png",
 }
 
 
@@ -141,7 +141,6 @@ def get_avg_buy_price(account, symbol):
 
 
 def get_price(symbol, force_refresh=False):
-    """Fetch price — CoinGecko (with demo API key) for crypto; TwelveData for forex."""
     if symbol not in ASSETS:
         return None
 
@@ -176,7 +175,6 @@ def get_price(symbol, force_refresh=False):
                 pass
         return None
 
-    # Forex
     try:
         r = requests.get(
             "https://api.twelvedata.com/price",
@@ -585,7 +583,6 @@ def get_override_status_api(request, symbol):
 
 @login_required
 def get_klines_api(request, symbol):
-    """Candles — CoinGecko with demo API key. 2-minute cache."""
     if symbol not in ASSETS:
         return JsonResponse({"error": "Invalid symbol"}, status=400)
 
@@ -652,10 +649,9 @@ def get_klines_api(request, symbol):
 
 @login_required
 def get_market_list_api(request):
-    """Market list — 22 symbols. Cached 5 minutes."""
     import time as _time
 
-    cache_key = "market_list_data_v3"
+    cache_key = "market_list_data_v4"
     cached = cache.get(cache_key)
     if cached:
         return JsonResponse(cached)
@@ -688,7 +684,6 @@ def get_market_list_api(request):
                                 spark = [float(p[1]) for p in prices[::step]][:24]
                         except Exception:
                             pass
-
                     _time.sleep(0.3)
                 else:
                     try:
@@ -956,11 +951,10 @@ def mobile_trade(request, symbol):
     account = get_account(request.user)
     asset = ASSETS[symbol]
 
-        if asset["type"] == "crypto":
+    if asset["type"] == "crypto":
         tv_symbol = f"BINANCE:{asset['binance']}"
     else:
         pair = asset["pair"].replace("/", "")
-        # XAU/USD, XAG/USD ko "OANDA:" use karo
         if pair in ("XAUUSD", "XAGUSD"):
             tv_symbol = f"OANDA:{pair}"
         else:
@@ -979,7 +973,6 @@ def mobile_trade(request, symbol):
 
 @login_required
 def get_mobile_positions_api(request):
-    """Mobile Orders tab — cache-first for instant response."""
     account = get_account(request.user)
     positions = account.positions.filter(status="OPEN").order_by("-opened_at")
 
@@ -1030,7 +1023,6 @@ def get_mobile_positions_api(request):
 
 @login_required
 def get_mobile_history_api(request):
-    """Mobile Orders tab — closed contract positions."""
     account = get_account(request.user)
     closed = account.positions.filter(status="CLOSED").order_by("-closed_at")
 
