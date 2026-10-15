@@ -41,6 +41,8 @@ ASSETS = {
     "AUDUSD": {"label": "AUD/USD", "type": "forex", "pair": "AUD/USD"},
     "USDCAD": {"label": "USD/CAD", "type": "forex", "pair": "USD/CAD"},
     "EURGBP": {"label": "EUR/GBP", "type": "forex", "pair": "EUR/GBP"},
+        "XAUUSD": {"label": "Gold", "type": "forex", "pair": "XAU/USD"},
+    "XAGUSD": {"label": "Silver", "type": "forex", "pair": "XAG/USD"},
 }
 
 CG_IDS = {
@@ -75,6 +77,8 @@ COIN_ICONS = {
     "AUDUSD": "https://flagcdn.com/w80/au.png",
     "USDCAD": "https://flagcdn.com/w80/ca.png",
     "EURGBP": "https://flagcdn.com/w80/eu.png",
+        "XAUUSD": "https://flagcdn.com/w80/un.png",
+    "XAGUSD": "https://flagcdn.com/w80/un.png",
 }
 
 
@@ -952,11 +956,15 @@ def mobile_trade(request, symbol):
     account = get_account(request.user)
     asset = ASSETS[symbol]
 
-    if asset["type"] == "crypto":
+        if asset["type"] == "crypto":
         tv_symbol = f"BINANCE:{asset['binance']}"
     else:
         pair = asset["pair"].replace("/", "")
-        tv_symbol = f"FX:{pair}"
+        # XAU/USD, XAG/USD ko "OANDA:" use karo
+        if pair in ("XAUUSD", "XAGUSD"):
+            tv_symbol = f"OANDA:{pair}"
+        else:
+            tv_symbol = f"FX:{pair}"
 
     context = {
         "symbol": symbol,
