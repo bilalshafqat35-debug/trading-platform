@@ -1541,7 +1541,7 @@ h3 {
     padding: 12px 18px !important;
     background: rgba(15, 20, 41, 0.98) !important;
     border-bottom: 1px solid rgba(16, 185, 129, 0.2) !important;
-    position: sticky !important;
+    position: relative !important;
     top: 0 !important;
     z-index: 100 !important;
     height: 60px !important;
@@ -2396,7 +2396,6 @@ h3 {
     padding: 12px 18px !important;
     background: rgba(15, 20, 41, 0.98) !important;
     border-bottom: 1px solid rgba(16, 185, 129, 0.2) !important;
-    position: sticky !important;
     top: 0 !important;
     z-index: 100 !important;
     height: 60px !important;
