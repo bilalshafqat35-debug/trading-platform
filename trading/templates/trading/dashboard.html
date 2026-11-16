@@ -9,17 +9,18 @@
 </head>
 <body class="app-body">
 
-  <!-- MOBILE HEADER -->
-  <div class="mobile-brand">
-  <div class="ig-logo-mobile">
-    <span class="ig-main">IG</span>
-    <span class="ig-sub">TRADERS</span>
+<div class="mobile-header">
+  <div class="mobile-balance">
+    ${{ balance|floatformat:2 }}
   </div>
-</div>
-    <div class="mobile-balance">
-      ${{ balance|floatformat:2 }}
+  <div class="mobile-brand">
+    <div class="ig-logo-mobile">
+      <span class="ig-main">IG</span>
+      <span class="ig-sub">TRADERS</span>
     </div>
   </div>
+  <div style="width: 80px;"></div>
+</div>
 
   <!-- DESKTOP HEADER -->
   <header class="desktop-header">
